@@ -46,7 +46,11 @@ namespace
     const char comp3[] = "C,60E32B7AB47F\r";
     RxTxMachine uartMachine(uartCmdr1.pHandle, uartCmdr1.pBuff, RxRecieveResponse);
 
-    char* remote;
+    const char* remotes[] = {comp1, comp2, comp3};
+    uint16_t remoteIdx = 0;
+    uint8_t updateRemote = 0;
+
+    char * remote;
 }
 
 
@@ -60,7 +64,11 @@ void FlashLed(GPIO_TypeDef* gpio, uint16_t gpioPin)
   }
 }
 
-
+void switch_remote()
+{
+    remoteIdx = (remoteIdx >= NUM_REMOTE_OPTIONS-1) ? 0 : remoteIdx++;
+    updateRemote = 1;
+}
 
 void mouse_command(UART_HandleTypeDef* pHandle, uint8_t buttons, uint8_t x, uint8_t y) 
 {
@@ -95,6 +103,22 @@ char * get_remote_address()
     // return retval;
 }
 
+char * get_desired_remote_address()
+{
+    char* retVal = (char*)remotes[remoteIdx];
+    retVal += 2; // get past C,
+    return remote;
+}
+
+uint8_t update_remote()
+{
+    if (updateRemote == 1)
+    {
+        updateRemote = 0;
+        return 1;
+    }
+}
+
 void bt_start_task(UART_HandleTypeDef* pHandle)
 {
     printf("Entered bt_start_task\n\r");
@@ -126,33 +150,32 @@ void bt_start_task(UART_HandleTypeDef* pHandle)
         break;
     case BT_PRINT_UART:
     	pUartCmder->state = pUartCmder->pendingState;
-#ifdef DEBUG
         uartMachine.print_uart();
-#endif
         break;
     case BT_READY:
         status = enterDeviceSearch(pHandle, pUartCmder);
         if (status == NC_NO_ERROR)
         {
             pUartCmder->state = BT_PRINT_UART;
-            // pUartCmder->pendingState = BT_SEARCH_CONNECT;
             pUartCmder->pendingState = BT_CONNECT;
         }
         break;
     case BT_SEARCH_CONNECT:
+        
+        break;
+    case BT_CONNECT:
+        uartMachine.send_uart_message(remotes[remoteIdx]);
+        osDelay(100);
+        uartMachine.send_uart_message("---\r");
+        pUartCmder->state = BT_HID_MODE;
+        break;
+    case BT_ENTER_HID:
         status = enterHID(pHandle, pUartCmder);
         if (status == NC_NO_ERROR)
         {
             pUartCmder->state = BT_CMD_MODE;
             pUartCmder->pendingState = BT_CONNECT;
         }
-        break;
-    case BT_CONNECT:
-        uartMachine.send_uart_message(comp1);
-        osDelay(100);
-        uartMachine.send_uart_message("---\r");
-        pUartCmder->state = BT_HID_MODE;
-        printf("Moving to Idle Mode");
         break;
     case BT_HID_MODE:
         HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
@@ -193,22 +216,8 @@ err enterHID(UART_HandleTypeDef *pHandle, btCommander *pUartCmder)
 }
 
 err enterDeviceSearch(UART_HandleTypeDef* pHandle, btCommander* pUartCmder)
-{
-    // enterCmdModeValidate(pHandle, pUartCmder);
-
-	// get_uart_message(pHandle, pUartCmder->pBuff, BUFF_SIZE, 1);
-	// uartMachine.send_uart_message("GR\r");
-    
+{   
     remote = uartMachine.send_rec_uart_message(SIZE_REMOTE, "GR\r");
-
-    // uartMachine.send_uart_message("C\r");
-    // uartMachine.send_uart_message("---\r");
-    
-    // uartMachine.send_uart_message("C\r");
-    // get_uart_message(pHandle, pUartCmder->pBuff, 1);
-    // uartMachine.send_uart_message("---\r");
-    // get_uart_message(pHandle, pUartCmder->pBuff, 1);
-
 
     return NC_NO_ERROR;
 }

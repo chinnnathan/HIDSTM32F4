@@ -35,8 +35,6 @@ class RxTxMachine
             uint8_t reserved : 5;
         };
         uint8_t all;
-
-        /* data */
     } flags;
     
 

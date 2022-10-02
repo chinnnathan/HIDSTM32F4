@@ -15,22 +15,12 @@ constexpr uint32_t UART_RX_TIMEOUT = 1000;
 namespace
 {
     uint8_t buff[UART_LOG_SIZE];
-    uint8_t overflow = 0;
     RxTxMachine *activePointer;
     uint8_t* pBuff = buff;
     uint16_t buffCounter = 0;
 }
 
 const uint8_t* pScratch = buff;
-
-static void FlashLed()
-{
-    for(uint16_t i = 0; i < 4; i++)
-    {
-        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
-        osDelay(50);
-    }
-}
 
 void set_active_machine(RxTxMachine *ptr)
 {
@@ -59,19 +49,20 @@ void reset_scratch_pointer()
 
 void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart)
 {
+#ifdef DEBUG
 	printf("Halfway\n\r");
+#endif
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
+#ifdef DEBUG
 	printf("Fully\n\r");
+#endif
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);
+
     activePointer->flags.intHit = 1;
-//    if (buffCounter+huart->RxXferSize < (UART_LOG_SIZE))
-//    {
-//    	memcpy(pBuff, huart->pRxBuffPtr, huart->RxXferSize);
-//		pBuff += huart->RxXferSize;
-//		buffCounter+= huart->RxXferSize;
-//    }
 }
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
@@ -100,10 +91,11 @@ char* RxTxMachine::send_rec_uart_message(size_t msgSizeRx, const char* msg)
 		start_uart_stream();
 	}
 
-    
     this->pBuffer = this->data + this->sizeBuffer;
 
-    auto status = HAL_UART_Transmit(this->pHandle, (const uint8_t*)msg, msgSizeTx, UART_TX_TIMEOUT);
+    HAL_UART_Transmit(this->pHandle, (const uint8_t*)msg, msgSizeTx, UART_TX_TIMEOUT);
+
+    osDelay(100);
 
     this->sizeBuffer += msgSizeRx;
 
@@ -151,7 +143,7 @@ void RxTxMachine::print_uart()
     for (; this->sizeBuffer < STREAM_BUFF_SIZE; this->sizeBuffer++)
     {
         printf("%c", this->data[this->sizeBuffer]);
-        if (this->data[this->sizeBuffer]= '\n')
+        if (this->data[this->sizeBuffer] == '\n')
         {
             this->sizeBuffer++;
             this->flags.countUnaligned = 0;
@@ -163,7 +155,7 @@ void RxTxMachine::print_uart()
         for (this->sizeBuffer = 0; this->sizeBuffer < savedIdx; this->sizeBuffer++)
         {
             printf("%c", this->data[this->sizeBuffer]);
-            if (this->data[this->sizeBuffer] = '\n')
+            if (this->data[this->sizeBuffer] == '\n')
             {
                 this->sizeBuffer++;
                 this->flags.countUnaligned = 0;

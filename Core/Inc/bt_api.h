@@ -15,6 +15,7 @@
 
 #include "main.h"
 #define SIZE_REMOTE 14
+#define NUM_REMOTE_OPTIONS 3
 
  void bt_start_task(UART_HandleTypeDef *pHandle);
  uint8_t bt_do_wiggle(void);
@@ -30,6 +31,8 @@ typedef enum {
     BT_CONNECT,
     BT_HID_MODE, 
     BT_SPP_MODE,
+    BT_ENTER_HID,
+    BT_ENTER_SPP,
     BT_INVALID
 } btState;
 
@@ -42,6 +45,10 @@ typedef struct btCommander {
 
 btState get_bt_state();
 char * get_remote_address();
+char * get_desired_remote_address();
+
+void switch_remote();
+uint8_t update_remote();
 
 
 #ifdef __cplusplus

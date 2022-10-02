@@ -6,7 +6,6 @@
 
 namespace 
 {
-    uint8_t init = 0;
     FontDef_t* useFont = &Font_7x10;
 }
 constexpr uint32_t maxLen = SSD1306_WIDTH / 7;
@@ -14,7 +13,8 @@ constexpr uint16_t startBlueY = 20;
 
 void print_oled(oledPrintType pt, char* str)
 {
-    uint16_t startY = 0;
+    uint16_t startY;
+    
     if (pt == OLED_INFO)
     {
         startY = 0;
@@ -22,6 +22,10 @@ void print_oled(oledPrintType pt, char* str)
     else if (pt == OLED_DATA)
     {
         startY = startBlueY;
+    }
+    else if (pt == OLED_SUBDATA)
+    {
+        startY = startBlueY + (3+useFont->FontHeight);
     }
     else
     {
@@ -40,14 +44,14 @@ void print_oled(oledPrintType pt, char* str)
     {
         uint32_t i = 0;
         uint32_t buffInc = 0;
-        while (buffInc < len)
+        // currently only support 1 line
+        // while (buffInc < len) 
         {
             SSD1306_GotoXY(0,startY + (i * (3 + useFont->FontHeight)));
             SSD1306_Puts(buff+buffInc, useFont, SSD1306_COLOR_WHITE);
             i++;
             buffInc += maxLen;
         }
-        // SSD1306_ScrollLeft(0,useFont->FontHeight);
     }
     SSD1306_UpdateScreen();
 }

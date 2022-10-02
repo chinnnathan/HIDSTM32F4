@@ -13,7 +13,8 @@
 typedef enum {
     OLED_INFO,
     OLED_DATA,
-    OLED_SUBDATA
+    OLED_SUBDATA,
+    OLED_BOTTOM
 }oledPrintType;
 
 void print_oled(oledPrintType pt, char* str);
