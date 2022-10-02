@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <ssd1306.h>
 #include <oled_io.h>
+#include "stm32f4xx_hal_tim.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,7 +56,8 @@ osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
 
 osThreadId wiggleTaskHandle;
-
+uint16_t gpioIntMask = 0;
+uint16_t debouncedGpioInt = 0;
 //#ifdef __GNUC__
 //#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
 //#else
@@ -88,13 +90,25 @@ static void MX_I2C1_Init(void);
 void StartDefaultTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
+void StartWiggleTask(void const * argument);
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void StartWiggleTask(void const * argument);
+void BlinkOnBoardLed()
+{
+    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+}
 
+// void DebounceGpio(TIM_HandleTypeDef *htim)
+// {
+//     HAL_TIM_Base_Stop(&htim2);
+//     BlinkOnBoardLed();
+//     debouncedGpioInt = gpioIntMask;
+//     gpioIntMask = 0;
+// //    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+// }
 /* USER CODE END 0 */
 
 /**
@@ -135,6 +149,12 @@ int main(void)
     SSD1306_Init();
     SSD1306_Clear();
     print_oled(OLED_DATA, "hello");
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);
+
+//    HAL_TIM_RegisterCallback(&htim2, HAL_TIM_PERIOD_ELAPSED_CB_ID, DebounceGpio);
+    // HAL_TIM_RegisterCallback(&htim2, HAL_TIM_PERIOD_ELAPSED_CB_ID, BlinkOnBoardLed);
+
+
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -211,7 +231,7 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
@@ -381,6 +401,7 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOE_CLK_ENABLE();
 
@@ -400,6 +421,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : PC7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_7;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
   /*Configure GPIO pins : PD0 PD1 PD2 PD3 */
   GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -414,9 +441,27 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
 }
 
 /* USER CODE BEGIN 4 */
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
+    if (GPIO_Pin == GPIO_PIN_7 && (GPIO_Pin & gpioIntMask) == 0)
+    {
+        gpioIntMask |= GPIO_PIN_7;
+        
+        // HAL_TIM_Base_Start_IT(&htim2);
+//        HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+    }
+}
+
+
 /**
  * @brief StartWiggleTask will wiggle all uart states that are valid
  * 
@@ -471,6 +516,15 @@ void StartDefaultTask(void const * argument)
   for(;;)
   {
 	osDelay(1000);
+
+    if(gpioIntMask)
+    {
+        gpioIntMask = 0;
+        switch_remote();
+        nextRemote = get_desired_remote_address();
+        snprintf(buffer, sizeof(buffer), "DADR:%.12s", nextRemote);
+        print_oled(OLED_BOTTOM, buffer);
+    }
 
     lastState = machineState;
     machineState = get_bt_state();
@@ -529,13 +583,12 @@ void StartDefaultTask(void const * argument)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   /* USER CODE BEGIN Callback 0 */
-
   /* USER CODE END Callback 0 */
   if (htim->Instance == TIM1) {
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
-
+    
   /* USER CODE END Callback 1 */
 }
 

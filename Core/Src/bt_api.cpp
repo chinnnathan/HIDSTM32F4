@@ -117,6 +117,7 @@ uint8_t update_remote()
         updateRemote = 0;
         return 1;
     }
+    return 0;
 }
 
 void bt_start_task(UART_HandleTypeDef* pHandle)

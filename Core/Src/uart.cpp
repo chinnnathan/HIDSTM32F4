@@ -52,7 +52,7 @@ void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart)
 #ifdef DEBUG
 	printf("Halfway\n\r");
 #endif
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);
+    // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
@@ -60,7 +60,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 #ifdef DEBUG
 	printf("Fully\n\r");
 #endif
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);
+    // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);
 
     activePointer->flags.intHit = 1;
 }
