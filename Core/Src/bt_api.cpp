@@ -107,7 +107,7 @@ char * get_desired_remote_address()
 {
     char* retVal = (char*)remotes[remoteIdx];
     retVal += 2; // get past C,
-    return remote;
+    return retVal;
 }
 
 uint8_t update_remote()

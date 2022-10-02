@@ -132,6 +132,9 @@ int main(void)
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
 
+    SSD1306_Init();
+    SSD1306_Clear();
+    print_oled(OLED_DATA, "hello");
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -424,8 +427,8 @@ void StartWiggleTask(void const * argument)
 	uint16_t secRuns = 60 * 11;
 	// uint16_t secRuns = 102;
 	uint16_t secRun  = 0;
-    char buffer[32];
-    char subbuf[16];
+    char buffer[18];
+    char subbuf[18];
   /* Infinite loop */
   for(;;)
   {
@@ -433,7 +436,7 @@ void StartWiggleTask(void const * argument)
     if(secRun)
     {
     	secRun--;
-        snprintf(buffer, sizeof(buffer), "Wiggle Countdown: % 5d", secRun);
+        snprintf(buffer, sizeof(buffer), "Next Wiggle: % 4d", secRun);
         print_oled(OLED_DATA, buffer);
     }
     else if(bt_do_wiggle())
@@ -459,10 +462,8 @@ void StartDefaultTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_1, GPIO_PIN_SET);
-
-    SSD1306_Init();
-    SSD1306_Clear();
-    print_oled(OLED_DATA, "hello");
+    char buffer[18];
+    char* nextRemote;
 
     btState machineState, lastState;
     lastState = BT_INVALID;
@@ -480,7 +481,10 @@ void StartDefaultTask(void const * argument)
     {
         case BT_INITIALIZED:
             print_oled(OLED_INFO, "Initialized");
-                break;
+            nextRemote = get_desired_remote_address();
+            snprintf(buffer, sizeof(buffer), "DADR:%.12s", nextRemote);
+            print_oled(OLED_BOTTOM, buffer);
+            break;
         case BT_CMD_MODE:
             print_oled(OLED_INFO, "CMD");
             break;
