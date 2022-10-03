@@ -155,12 +155,12 @@ int main(void)
 
   /* Create the thread(s) */
   /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityAboveNormal, 1, 256);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-  osThreadDef(wiggleTask, StartWiggleTask, osPriorityNormal, 0, 128);
+  osThreadDef(wiggleTask, StartWiggleTask, osPriorityNormal, 1, 128);
   wiggleTaskHandle = osThreadCreate(osThread(wiggleTask), NULL);
   /* USER CODE END RTOS_THREADS */
 
@@ -438,7 +438,6 @@ void StartWiggleTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
     osDelay(1000);
     if(secRun)
     {
@@ -471,17 +470,37 @@ void StartDefaultTask(void const * argument)
 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_1, GPIO_PIN_SET);
     char buffer[18];
     char* nextRemote;
+    uint16_t inputSelect = 0;
+    uint16_t inputSelectLast = 0;
+    err status = NC_ERROR;
 
     btState machineState, lastState;
     lastState = BT_INVALID;
   /* Infinite loop */
   for(;;)
   {
-	osDelay(1000);
+
+    inputSelect = (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_7) == GPIO_PIN_SET)) << 0 |
+                  (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_8) == GPIO_PIN_SET)) << 1 |
+                  (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_9) == GPIO_PIN_SET)) << 2 |
+                  (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_10) == GPIO_PIN_SET)) << 3;
+
+
+	if ( inputSelect != inputSelectLast )
+	{
+		inputSelectLast = inputSelect;
+		switch_remote(inputSelect);
+		set_bt_state(BT_INITIALIZED);
+	}
 
     lastState = machineState;
     machineState = get_bt_state();
-    bt_start_task(&huart1);
+    status = bt_start_task(&huart1);
+
+    if (status == NC_ERROR)
+    {
+        print_oled(OLED_DATA, "ERR");
+    }
 
     if ( machineState != lastState )
     {
@@ -517,11 +536,9 @@ void StartDefaultTask(void const * argument)
         default:
             break;
         }
-    	osDelay(1000);
     }
+	osDelay(1000);
 
-    
-    
   }
   /* USER CODE END 5 */
 }

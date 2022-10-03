@@ -64,9 +64,21 @@ void FlashLed(GPIO_TypeDef* gpio, uint16_t gpioPin)
   }
 }
 
-void switch_remote()
+void switch_remote(uint16_t sel)
 {
-    remoteIdx = (remoteIdx >= NUM_REMOTE_OPTIONS-1) ? 0 : remoteIdx++;
+    if (sel & 0x0004)
+    {
+        remoteIdx = 2;
+    }
+    else if (sel & 0x0002)
+    {
+        remoteIdx = 1;
+    }
+    else if (sel & 0x0001)
+    {
+        remoteIdx = 0;
+    }
+//    remoteIdx = (remoteIdx >= NUM_REMOTE_OPTIONS-1) ? 0 : remoteIdx++;
     updateRemote = 1;
 }
 
@@ -90,6 +102,11 @@ uint8_t bt_do_wiggle(void)
 btState get_bt_state()
 {
     return uartCmdr1.state;
+}
+
+void set_bt_state(btState state)
+{
+    uartCmdr1.state = state;
 }
 
 char * get_remote_address()
@@ -119,7 +136,7 @@ uint8_t update_remote()
     }
 }
 
-void bt_start_task(UART_HandleTypeDef* pHandle)
+err bt_start_task(UART_HandleTypeDef* pHandle)
 {
     printf("Entered bt_start_task\n\r");
     btCommander* pUartCmder = &uartCmdr1;
@@ -178,14 +195,17 @@ void bt_start_task(UART_HandleTypeDef* pHandle)
         }
         break;
     case BT_HID_MODE:
-        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
+        // HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
         osDelay(1000);
+        status = NC_NO_ERROR;
         break;
     default:
         HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
         osDelay(250);
         break;
     }
+
+    return status;
 }
 
 err enterCmdModeValidate(UART_HandleTypeDef* pHandle, btCommander* pUartCmder)

@@ -17,7 +17,7 @@
 #define SIZE_REMOTE 14
 #define NUM_REMOTE_OPTIONS 3
 
- void bt_start_task(UART_HandleTypeDef *pHandle);
+ err bt_start_task(UART_HandleTypeDef *pHandle);
  uint8_t bt_do_wiggle(void);
 
  void FlashLed(GPIO_TypeDef* gpio, uint16_t gpioPin);
@@ -44,10 +44,11 @@ typedef struct btCommander {
 } btCommander;
 
 btState get_bt_state();
+void    set_bt_state(btState);
 char * get_remote_address();
 char * get_desired_remote_address();
 
-void switch_remote();
+void switch_remote(uint16_t sel);
 uint8_t update_remote();
 
 
