@@ -380,9 +380,9 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOE_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
@@ -399,6 +399,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PE7 PE8 PE9 PE10 */
+  GPIO_InitStruct.Pin = GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PD0 PD1 PD2 PD3 */
   GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3;
@@ -432,6 +438,7 @@ void StartWiggleTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
+    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
     osDelay(1000);
     if(secRun)
     {
@@ -474,6 +481,7 @@ void StartDefaultTask(void const * argument)
 
     lastState = machineState;
     machineState = get_bt_state();
+    bt_start_task(&huart1);
 
     if ( machineState != lastState )
     {
@@ -512,7 +520,7 @@ void StartDefaultTask(void const * argument)
     	osDelay(1000);
     }
 
-    bt_start_task(&huart1);
+    
     
   }
   /* USER CODE END 5 */
