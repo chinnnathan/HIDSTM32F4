@@ -155,7 +155,7 @@ int main(void)
 
   /* Create the thread(s) */
   /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityAboveNormal, 1, 256);
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 1, 2048);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -430,8 +430,8 @@ static void MX_GPIO_Init(void)
  */
 void StartWiggleTask(void const * argument)
 {
-	uint16_t secRuns = 60 * 11;
-	// uint16_t secRuns = 102;
+	uint16_t secRuns = 60 * 9;
+	// secRuns = 30;
 	uint16_t secRun  = 0;
     char buffer[18];
     char subbuf[18];
@@ -470,6 +470,7 @@ void StartDefaultTask(void const * argument)
 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_1, GPIO_PIN_SET);
     char buffer[18];
     char* nextRemote;
+    char* addr;
     uint16_t inputSelect = 0;
     uint16_t inputSelectLast = 0;
     err status = NC_ERROR;
@@ -521,7 +522,13 @@ void StartDefaultTask(void const * argument)
         case BT_PRINT_UART:
             print_oled(OLED_INFO, "Print UART");
             break;
+        case BT_ENTER_HID:
+			print_oled(OLED_INFO, "Set HID");
+			break;
         case BT_HID_MODE:
+            addr = get_remote_address();
+            snprintf(buffer, sizeof(buffer), "ADR:%.12s", addr);
+            print_oled(OLED_SUBDATA, buffer);
             print_oled(OLED_INFO, "HID Mode");
             break;
         case BT_SPP_MODE:

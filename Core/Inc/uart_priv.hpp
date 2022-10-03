@@ -2,7 +2,7 @@
 #include <ncerr.h>
 
 typedef void (*registerRxCallback)(uint8_t* pBuff);
-constexpr uint32_t STREAM_BUFF_SIZE = 64;
+constexpr uint32_t STREAM_BUFF_SIZE = 512;
 
 class RxTxMachine
 {
@@ -15,6 +15,7 @@ class RxTxMachine
 
     uint8_t retryCount = 5;
     uint16_t retryDelay = 100;
+    char * strFind;
     public:
 
     registerRxCallback pCallback;
@@ -45,12 +46,15 @@ class RxTxMachine
         sizeBuffer = sizeof(buffer);
         pCallback = callback;
         flags.all = 0;
+        strFind = "\r\n";
     }
 
     ~RxTxMachine()
     {
 
     }
+
+    void reset_buffer_ptr() { this->sizeBuffer = 0; }
 
     HAL_StatusTypeDef   start_uart_stream();
 
@@ -60,7 +64,8 @@ class RxTxMachine
 
     err     send_rec_val_uart_message(const char* msgTx, const char* msgVal);
     char*   send_rec_uart_message(size_t msgSize, const char* msg);
-    err     send_rec_print_uart(const char* msgTx);
+    char*   send_rec_uart_message(const char* msg, const char* search);
+    err     send_rec_print_uart(const char* msgTx, const char* strFind);
     HAL_StatusTypeDef send_uart_message(const char* mes);
 
     HAL_StatusTypeDef   send_uart_message(UART_HandleTypeDef *pHandle, const char* mes);

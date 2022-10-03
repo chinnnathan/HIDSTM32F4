@@ -102,6 +102,62 @@ char* RxTxMachine::send_rec_uart_message(size_t msgSizeRx, const char* msg)
     return (char*)this->pBuffer;
 }
 
+char* RxTxMachine::send_rec_uart_message(const char* msg, const char* str)
+{
+    size_t msgSizeTx = strlen(msg);
+    uint16_t savedIdx = this->sizeBuffer;
+    uint16_t findcount = 0;
+	uint16_t findMax = strlen(this->strFind);
+
+    if (!is_rx_dma_running())
+	{
+		start_uart_stream();
+	}
+
+    this->pBuffer = this->data + this->sizeBuffer;
+
+    HAL_UART_Transmit(this->pHandle, (const uint8_t*)msg, msgSizeTx, UART_TX_TIMEOUT);
+
+    osDelay(100);
+    
+    for (; this->sizeBuffer < STREAM_BUFF_SIZE; this->sizeBuffer++)
+    {
+        printf("%c", this->data[this->sizeBuffer]);
+        if (this->data[this->sizeBuffer] == str[findcount])
+        {
+            findcount++;
+            if (findcount == findMax)
+            {
+                this->sizeBuffer++;
+                break;
+            }
+        }
+        else if (findcount)
+        {
+        	findcount = 0;
+        }
+    }
+    if (this->flags.intHit)
+    {
+        for (this->sizeBuffer = 0; this->sizeBuffer < savedIdx; this->sizeBuffer++)
+        {
+            printf("%c", this->data[this->sizeBuffer]);
+            if (this->data[this->sizeBuffer] == str[findcount])
+            {
+                findcount++;
+                if (findcount == findMax)
+                {
+                    this->flags.intHit = 0;
+                    this->sizeBuffer++;
+                    break;
+                }                
+            }
+        }
+    }
+
+    return (char*)this->pBuffer;
+}
+
 err RxTxMachine::send_rec_val_uart_message(const char* msgTx, const char* msgVal)
 {
     size_t msgSizeTx = strlen(msgTx);
@@ -137,17 +193,26 @@ err RxTxMachine::send_rec_val_uart_message(const char* msgTx, const char* msgVal
 void RxTxMachine::print_uart()
 {
     auto savedIdx = this->sizeBuffer;
+    auto findcount = 0;
+	auto findMax = strlen(this->strFind);
 
     printf("\n-----------------------\n");
 
     for (; this->sizeBuffer < STREAM_BUFF_SIZE; this->sizeBuffer++)
     {
         printf("%c", this->data[this->sizeBuffer]);
-        if (this->data[this->sizeBuffer] == '\n')
+        if (this->data[this->sizeBuffer] == this->strFind[findcount])
         {
-            this->sizeBuffer++;
-            this->flags.countUnaligned = 0;
-            break;
+            findcount++;
+            if (findcount == findMax)
+            {
+                this->flags.countUnaligned = 0;
+                break;
+            }
+        }
+        else if (findcount)
+        {
+        	findcount = 0;
         }
     }
     if (this->flags.intHit)
@@ -155,19 +220,22 @@ void RxTxMachine::print_uart()
         for (this->sizeBuffer = 0; this->sizeBuffer < savedIdx; this->sizeBuffer++)
         {
             printf("%c", this->data[this->sizeBuffer]);
-            if (this->data[this->sizeBuffer] == '\n')
+            if (this->data[this->sizeBuffer] == this->strFind[findcount])
             {
-                this->sizeBuffer++;
-                this->flags.countUnaligned = 0;
-                this->flags.intHit = 0;
-                break;
+                findcount++;
+                if (findcount == findMax)
+                {
+                    this->flags.countUnaligned = 0;
+                    this->flags.intHit = 0;
+                    break;
+                }                
             }
         }
     }
     printf("\n-----------------------\n");
 }
 
-err RxTxMachine::send_rec_print_uart(const char* msgTx)
+err RxTxMachine::send_rec_print_uart(const char* msgTx, const char* strFind)
 {
     size_t msgSizeTx = strlen(msgTx);
 
@@ -182,6 +250,7 @@ err RxTxMachine::send_rec_print_uart(const char* msgTx)
     HAL_UART_Transmit(this->pHandle, (const uint8_t*)msgTx, msgSizeTx, UART_TX_TIMEOUT);
 
     this->flags.countUnaligned = 1;
+    this->strFind = (char*)strFind;
 
     return NC_NO_ERROR;
 } 
@@ -211,24 +280,6 @@ HAL_StatusTypeDef RxTxMachine::send_uart_message(const char* mes)
 #ifdef DEBUG
     osDelay(100);
 #endif
-
-    if (this->flags.intHit)
-    {
-        this->flags.intHit = 0;
-        this->sizeBuffer = 0;
-    }
-    this->pBuffer = this->data + this->sizeBuffer;
-    
-    for (; this->sizeBuffer < STREAM_BUFF_SIZE; this->sizeBuffer++)
-    {
-        // find empty index
-        if (this->data[this->sizeBuffer] == '\n')
-        {
-            this->sizeBuffer++;
-            break;
-        }
-    }
-
     return status;
 }
 

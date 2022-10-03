@@ -14,7 +14,8 @@
 
 #define UART_TX_TIMEOUT 1000
 #define UART_RX_TIMEOUT 1000
-
+//#define GET_INQ 1
+//#define GET_MODE 1
 
 namespace
 {
@@ -41,16 +42,31 @@ static void RxRecieveResponse(uint8_t* pBuff)
 
 namespace
 {
-    const char comp1[] = "C,001A7DDA7115\r";
-    const char comp2[] = "C,3800251D32D2\r";
-    const char comp3[] = "C,60E32B7AB47F\r";
+    const char comp1[] = "SR,001A7DDA7115\r";
+    const char comp2[] = "SR,60E32B7AB47F\r";
+    const char comp3[] = "SR,A0A4C5965153\r";
+
+    const char* connect[] = {
+    "C,001A7DDA7115\r",
+    "C,60E32B7AB47F\r",
+    "C,A0A4C5965153\r",
+    };
+    /*
+    A0A4C5965153,NCHINN-MOBL2,2A010C
+    60E32B7AB47F,AP-J5MN2J3,2A010C
+    001A7DDA7115,MAIN,2A0104
+    Inquiry Done*/
+    // const char comp1[] = "C,001A7DDA7115\r";
+    // const char comp2[] = "C,3800251D32D2\r";
+    // const char comp3[] = "C,60E32B7AB47F\r";
+    // const char comp4[] = "C,A0A4C5965153\r";
     RxTxMachine uartMachine(uartCmdr1.pHandle, uartCmdr1.pBuff, RxRecieveResponse);
 
     const char* remotes[] = {comp1, comp2, comp3};
     uint16_t remoteIdx = 0;
     uint8_t updateRemote = 0;
 
-    char * remote;
+    char remote[SIZE_REMOTE];
 }
 
 
@@ -66,7 +82,7 @@ void FlashLed(GPIO_TypeDef* gpio, uint16_t gpioPin)
 
 void switch_remote(uint16_t sel)
 {
-    if (sel & 0x0004)
+	if (sel & 0x0004)
     {
         remoteIdx = 2;
     }
@@ -123,7 +139,7 @@ char * get_remote_address()
 char * get_desired_remote_address()
 {
     char* retVal = (char*)remotes[remoteIdx];
-    retVal += 2; // get past C,
+    retVal += 3; // get past SR,
     return retVal;
 }
 
@@ -138,7 +154,6 @@ uint8_t update_remote()
 
 err bt_start_task(UART_HandleTypeDef* pHandle)
 {
-    printf("Entered bt_start_task\n\r");
     btCommander* pUartCmder = &uartCmdr1;
 
     err status = NC_ERROR;
@@ -167,31 +182,50 @@ err bt_start_task(UART_HandleTypeDef* pHandle)
         break;
     case BT_PRINT_UART:
     	pUartCmder->state = pUartCmder->pendingState;
+#ifdef GET_INQ
         uartMachine.print_uart();
+#endif
         break;
     case BT_READY:
         status = enterDeviceSearch(pHandle, pUartCmder);
         if (status == NC_NO_ERROR)
         {
             pUartCmder->state = BT_PRINT_UART;
-            pUartCmder->pendingState = BT_CONNECT;
+            pUartCmder->pendingState = BT_ENTER_HID;
+//            pUartCmder->pendingState = BT_CONNECT;
         }
         break;
     case BT_SEARCH_CONNECT:
-        
+    	// uartMachine.send_uart_message("K,\r");
+		// osDelay(100);
+        // uartMachine.send_uart_message(remotes[remoteIdx]);
+		// status = resetRN42(pUartCmder);
+		// if (status == NC_NO_ERROR)
+		{
+			pUartCmder->state = BT_CMD_MODE;
+			pUartCmder->pendingState = BT_CONNECT;
+		}
         break;
     case BT_CONNECT:
-        uartMachine.send_uart_message(remotes[remoteIdx]);
+        uartMachine.send_rec_uart_message(connect[remoteIdx], "\r\n");
+        status = enterDeviceSearch(pHandle, pUartCmder);
+
+        uartMachine.send_rec_uart_message("GM\r", "\r\n");
+        uartMachine.send_rec_uart_message("GK\r", "\r\n");
         osDelay(100);
+        FlashLed();
+        uartMachine.send_rec_uart_message("C\r", "\r\n");
+//        uartMachine.send_uart_message("---\r");
+
         uartMachine.send_uart_message("---\r");
         pUartCmder->state = BT_HID_MODE;
         break;
     case BT_ENTER_HID:
         status = enterHID(pHandle, pUartCmder);
-        if (status == NC_NO_ERROR)
+        if (status == NC_SUCCESS)
         {
-            pUartCmder->state = BT_CMD_MODE;
-            pUartCmder->pendingState = BT_CONNECT;
+        	pUartCmder->state = BT_CMD_MODE;
+        	pUartCmder->pendingState = BT_CONNECT;
         }
         break;
     case BT_HID_MODE:
@@ -219,25 +253,56 @@ err resetRN42(btCommander* pUartCmder)
 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_1, GPIO_PIN_RESET);
 	osDelay(500);
 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_1, GPIO_PIN_SET);
+    uartMachine.reset_buffer_ptr();
     return NC_NO_ERROR;
 }
 
 err enterHID(UART_HandleTypeDef *pHandle, btCommander *pUartCmder)
 {
-    uartMachine.send_uart_message("S~,6\r");
-    uartMachine.send_uart_message("SH,0220\r");
-    uartMachine.send_uart_message("SM,0\r");
-    uartMachine.send_uart_message("R,1\r");
+    const char* recArray[] = {
+        "AOK\r\n", "AOK\r\n", "AOK\r\n", "Reboot!\r\n"
+    };
+    const char* issueArray[] = {
+        "S~,6\r", "SH,0220\r", "SM,6\r", "R,1\r"
+    };
+    err ret = NC_NO_ERROR;
+
+    ret = uartMachine.send_rec_val_uart_message(remotes[remoteIdx], "AOK\r\n");
+
+    for (uint16_t i = 0; i < 4; i++)
+    {
+        ret = uartMachine.send_rec_val_uart_message(issueArray[i], recArray[i]);
+        if (ret != NC_SUCCESS)
+        {
+            printf("Failed issue: %s : %s\n", issueArray[i], recArray[i]);
+//            return ret;
+        }
+    }
+
     osDelay(500);
     uartMachine.send_uart_message("---\r");
 
     FlashLed();
-    return NC_NO_ERROR;    
+    return ret;    
 }
 
 err enterDeviceSearch(UART_HandleTypeDef* pHandle, btCommander* pUartCmder)
 {   
-    remote = uartMachine.send_rec_uart_message(SIZE_REMOTE, "GR\r");
+//    char* tv = uartMachine.send_rec_uart_message(SIZE_REMOTE, "GR\r");
+    char* tv = uartMachine.send_rec_uart_message("GR\r", "\r\n");
+
+    memcpy(remote, tv, SIZE_REMOTE);
+
+#ifdef GET_INQ
+    osDelay(500);
+    uartMachine.send_rec_print_uart("I,10\r", "Done\r\n");
+    osDelay(15000);
+#endif
+#ifdef GET_MODE
+    osDelay(500);
+	uartMachine.send_rec_print_uart("GM\r", "\r\n");
+	osDelay(15000);
+#endif
 
     return NC_NO_ERROR;
 }
@@ -248,12 +313,12 @@ err mouseWiggle(btCommander* pUartCmder)
 
 	for(auto i = 0; i < 10; i++)
 	{
-		mouse_command(pHandle, 0,232,232);
+		mouse_command(pHandle, 0,10,10);
 		osDelay(50);
 	}
 	for(auto i = 0; i < 10; i++)
 	{
-		mouse_command(pHandle, 0,24,24);
+		mouse_command(pHandle, 0,-10,-10);
 		osDelay(50);
 	}
 
