@@ -212,6 +212,7 @@ err bt_start_task(UART_HandleTypeDef* pHandle)
 
         uartMachine.send_rec_uart_message("GM\r", "\r\n");
         uartMachine.send_rec_uart_message("GK\r", "\r\n");
+        uartMachine.send_rec_uart_message("GA\r", "\r\n");
         osDelay(100);
         FlashLed();
         uartMachine.send_rec_uart_message("C\r", "\r\n");
@@ -263,7 +264,7 @@ err enterHID(UART_HandleTypeDef *pHandle, btCommander *pUartCmder)
         "AOK\r\n", "AOK\r\n", "AOK\r\n", "Reboot!\r\n"
     };
     const char* issueArray[] = {
-        "S~,6\r", "SH,0220\r", "SM,6\r", "R,1\r"
+        "S~,6\r", "SH,0220\r", "SM,0\r", "R,1\r"
     };
     err ret = NC_NO_ERROR;
 
@@ -313,15 +314,92 @@ err mouseWiggle(btCommander* pUartCmder)
 
 	for(auto i = 0; i < 10; i++)
 	{
-		mouse_command(pHandle, 0,10,10);
+		mouse_command(pHandle, 0,20,20);
 		osDelay(50);
 	}
 	for(auto i = 0; i < 10; i++)
 	{
-		mouse_command(pHandle, 0,-10,-10);
+		mouse_command(pHandle, 0,-20,-20);
 		osDelay(50);
 	}
 
 
     return NC_NO_ERROR;
+}
+
+err connect_and_enter_hid(UART_HandleTypeDef* pHandle)
+{
+    err status = NC_ERROR;
+
+    const char* recArray[] = {
+        /*"AOK\r\n",*/ "AOK\r\n", "AOK\r\n", "Reboot!\r\n"
+    };
+    const char* issueArray[] = {
+        /*"S~,6\r",*/ "SH,0220\r", "SM,4\r", "R,1\r"
+    };
+
+    set_active_machine(&uartMachine);
+    uartMachine.set_uart_handle(pHandle);
+    uartMachine.start_uart_stream();
+
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_1, GPIO_PIN_RESET);
+	osDelay(500);
+	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_1, GPIO_PIN_SET);
+    uartMachine.reset_buffer_ptr();
+
+    osDelay(500);
+
+    status = uartMachine.send_rec_val_uart_message("$$$", "CMD\r\n");
+    osDelay(1000);
+
+    uartCmdr1.state = BT_CMD_MODE;
+
+    status = uartMachine.send_rec_val_uart_message(remotes[remoteIdx], "AOK\r\n");
+
+    for (uint16_t i = 0; i < 4; i++)
+    {
+        status = uartMachine.send_rec_val_uart_message(issueArray[i], recArray[i]);
+        if (status != NC_SUCCESS)
+        {
+            printf("Failed issue: %s : %s\n", issueArray[i], recArray[i]);
+            return status;
+        }
+    }
+    uartCmdr1.state = BT_ENTER_HID;
+    osDelay(1000);
+
+    status = uartMachine.send_rec_val_uart_message("$$$", "CMD\r\n");
+    uartCmdr1.state = BT_CMD_MODE;
+    osDelay(1000);
+
+    char* tv = uartMachine.send_rec_uart_message("GR\r", "\r\n");
+	memcpy(remote, tv, SIZE_REMOTE);
+
+	uartMachine.send_rec_uart_message("GM\r", "\r\n");
+	uartMachine.send_rec_uart_message("GK\r", "\r\n");
+	uartMachine.send_rec_uart_message("GH\r", "\r\n");
+	uartMachine.send_rec_uart_message("GA\r", "\r\n");
+	uartMachine.send_rec_uart_message("G~\r", "\r\n");
+
+	osDelay(1000);
+
+    uartMachine.send_rec_uart_message(connect[remoteIdx], "\r\n");
+
+    osDelay(500);
+    uartMachine.send_rec_uart_message("C\r", "\r\n");
+    osDelay(500);
+    uartMachine.send_uart_message("---\r");
+    osDelay(500);
+
+    uartCmdr1.state = BT_HID_MODE;
+
+    return status;
+}
+
+err is_bt_module_connected(UART_HandleTypeDef* pHandle)
+{
+    if(uartCmdr1.state == BT_HID_MODE)
+        return NC_SUCCESS;
+    
+    return NC_ERROR;
 }

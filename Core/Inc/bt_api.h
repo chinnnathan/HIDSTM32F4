@@ -48,6 +48,9 @@ void    set_bt_state(btState);
 char * get_remote_address();
 char * get_desired_remote_address();
 
+err connect_and_enter_hid(UART_HandleTypeDef* pHandle);
+err is_bt_module_connected(UART_HandleTypeDef* pHandle);
+
 void switch_remote(uint16_t sel);
 uint8_t update_remote();
 
