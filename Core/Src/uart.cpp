@@ -29,8 +29,6 @@ void set_active_machine(RxTxMachine *ptr)
     activePointer = ptr;
 }
 
-
-
 void print_used_scratch_pointer()
 {
     auto i = 0;
@@ -196,7 +194,7 @@ void RxTxMachine::print_uart()
 {
     auto savedIdx = this->sizeBuffer;
     auto findcount = 0;
-	auto findMax = strlen(this->strFind);
+	auto findMax = strlen(this->strFind.c_str());
 
     printf("\n-----------------------\n");
 

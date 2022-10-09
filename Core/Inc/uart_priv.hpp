@@ -15,16 +15,12 @@ class RxTxMachine
     size_t sizeBuffer;
 
     uint8_t data[STREAM_BUFF_SIZE];
-    uint8_t oldData[STREAM_BUFF_SIZE]; // extremely inelegant way to know where the streamed data stops
 
     uint8_t retryCount = 5;
-    uint16_t retryDelay = 100;
-    char * strFind;
-
-    
+    uint16_t retryDelay = 100;   
 
     public:
-    std::string retstr;
+    std::string retstr, strFind;
     uint8_t* pBuffer = data;
     UART_HandleTypeDef *pHandle;
 

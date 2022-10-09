@@ -407,8 +407,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PE7 PE8 PE9 */
-  GPIO_InitStruct.Pin = GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9;
+  /*Configure GPIO pins : PE7 PE8 PE9 PE0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_0;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
@@ -463,20 +463,32 @@ void StartWiggleTask(void const * argument)
     char buffer[18];
     char subbuf[18];
 
+    uint16_t maxRetry = 50;
+    uint16_t screenIdle = 0;
+
     toggle = HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_10);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1000);
+    
 
     if(!toggle)
     {
-        SSD1306_Clear();
-        snprintf(buffer, sizeof(buffer), "Idle");
-        print_oled(OLED_DATA, buffer);
+        if (!screenIdle)
+        {
+            SSD1306_Clear();
+            snprintf(buffer, sizeof(buffer), "Idle");
+            print_oled(OLED_DATA, buffer);
+            screenIdle = 1;
+        }
         osDelay(1000);
         secRun = 0;
         continue;
+    }
+    else
+    {
+        screenIdle = 0;
     }
 
     inputSelect = (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_7) == GPIO_PIN_SET)) << 0 |
@@ -484,7 +496,7 @@ void StartWiggleTask(void const * argument)
                   (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_9) == GPIO_PIN_SET)) << 2; // |
                 //   (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_10) == GPIO_PIN_SET)) << 3;
 
-    if ( connectStatus != NC_COMPLETE )
+    if (is_bt_module_connected() != NC_SUCCESS)
     {
     	connectStatus = connect_and_enter_hid(&huart1);
         print_oled(OLED_INFO, "Initializing BT");
@@ -494,7 +506,15 @@ void StartWiggleTask(void const * argument)
         }
         else if (connectStatus == NC_COMPLETE)
         {
-            print_oled(OLED_INFO, "BT Connected");
+            for(uint16_t i = 0; i < maxRetry; i++)
+            {
+                if(is_bt_module_connected() == NC_SUCCESS)
+                {
+                    print_oled(OLED_INFO, "BT Connected");
+                    break;
+                }
+                osDelay(50);
+            }
         }
     }
     else
@@ -504,10 +524,12 @@ void StartWiggleTask(void const * argument)
             secRun--;
             snprintf(buffer, sizeof(buffer), "Next Wiggle: % 4d", secRun);
             print_oled(OLED_DATA, buffer);
+            osDelay(1000);
         }
         else
         {
             bt_do_wiggle();
+            print_oled(OLED_INFO, "BlueTooth Wiggle");
             secRun = secRuns;
             char* addr = get_remote_address();
             snprintf(subbuf, sizeof(subbuf), "ADR:%.12s", addr);

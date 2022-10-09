@@ -126,12 +126,12 @@ err connect_and_enter_hid(UART_HandleTypeDef* pHandle)
 
 err bt_do_wiggle(void)
 {
-    for(auto i = 0; i < 10; i++)
+    for(auto i = 0; i < 5; i++)
 	{
         btModule.mouse_command(0,50,50);
 		osDelay(50);
 	}
-	for(auto i = 0; i < 10; i++)
+	for(auto i = 0; i < 5; i++)
 	{
         btModule.mouse_command(0,-50,-50);
 		osDelay(50);
@@ -140,10 +140,7 @@ err bt_do_wiggle(void)
     return NC_NO_ERROR;
 }
 
-err is_bt_module_connected(UART_HandleTypeDef* pHandle)
+err is_bt_module_connected()
 {
-    if(btModule.get_state() == BTState::BT_CONNECT)
-        return NC_SUCCESS;
-    
-    return NC_ERROR;
+    return btModule.is_connected();
 }

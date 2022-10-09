@@ -19,14 +19,6 @@ void RN42::mouse_command(uint8_t buttons, uint8_t x, uint8_t y)
     
 }
 
-void RN42::hard_reset()
-{
-    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_1, GPIO_PIN_RESET);
-	osDelay(500);
-	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_1, GPIO_PIN_SET);
-    this->uart->reset_buffer_ptr();
-}
-
 err RN42::soft_reset()
 {
     return this->uart->send_rec_val_uart_message("R,1", "Reboot!\r\n");
@@ -38,7 +30,28 @@ std::string RN42::get_remote_connected()
 }
 
 //*****************************************************************************
-// BT Class
+// RN42 Hard-wired interactions
+//*****************************************************************************
+void RN42::hard_reset()
+{
+    HAL_GPIO_WritePin(this->gpioReset, this->gpioResetPin, GPIO_PIN_RESET);
+	osDelay(500);
+	HAL_GPIO_WritePin(this->gpioReset, this->gpioResetPin, GPIO_PIN_SET);
+    this->uart->reset_buffer_ptr();
+}
+
+err RN42::is_connected()
+{
+    if (HAL_GPIO_ReadPin(this->gpioStatus, this->gpioStatusPin) == GPIO_PIN_SET)
+    {
+        return NC_SUCCESS;
+    }
+    return NC_ERROR;
+}
+
+
+//*****************************************************************************
+// BT Common and state machines
 //*****************************************************************************
 
 err RN42::process(msg* data)

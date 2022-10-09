@@ -32,7 +32,7 @@ const char * get_desired_remote_address();
 err connect_and_enter_hid(UART_HandleTypeDef* pHandle);
 err bt_do_wiggle(void);
 
-err is_bt_module_connected(UART_HandleTypeDef* pHandle);
+err is_bt_module_connected();
 
 void switch_remote(uint16_t sel);
 

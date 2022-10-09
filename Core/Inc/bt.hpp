@@ -40,7 +40,8 @@ class RN42
 	GPIO_TypeDef *gpioReset = GPIOE;
 	uint16_t      gpioResetPin = GPIO_PIN_1;
 
-    
+    GPIO_TypeDef *gpioStatus = GPIOE;
+	uint16_t      gpioStatusPin = GPIO_PIN_0;
 
 	btCmd<4> enterHID =
 	{
@@ -108,6 +109,7 @@ class RN42
     // State Confirmation checks
     //*************************************************************************
 	std::string get_remote_connected();
+    err is_connected();
 
 };
 
