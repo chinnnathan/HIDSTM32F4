@@ -17,58 +17,27 @@
 #define SIZE_REMOTE 14
 #define NUM_REMOTE_OPTIONS 3
 
- err bt_start_task(UART_HandleTypeDef *pHandle);
- uint8_t bt_do_wiggle(void);
-
- void FlashLed(GPIO_TypeDef* gpio, uint16_t gpioPin);
-
 typedef enum {
-	BT_READY, 
-    BT_INITIALIZED, 
-    BT_PRINT_UART,
-    BT_CMD_MODE,
-    BT_SEARCH_CONNECT,
-    BT_CONNECT,
-    BT_HID_MODE, 
-    BT_SPP_MODE,
-    BT_ENTER_HID,
-    BT_ENTER_SPP,
-    BT_INVALID
-} btState;
+	BT_ENTER_COMMAND_MODE,
+	BT_ENTER_SPP_MODE,
+	BT_GET,
+	BT_SET,
+	BT_TRY_CONNECT,
+	BT_RESET
+} btCommand;
 
-typedef struct btCommander {
-	btState state;
-    btState pendingState;
-	UART_HandleTypeDef *pHandle;
-	uint8_t pBuff[PBUFF_SIZE];
-} btCommander;
-
-btState get_bt_state();
-void    set_bt_state(btState);
-char * get_remote_address();
-char * get_desired_remote_address();
+const char * get_remote_address();
+const char * get_desired_remote_address();
 
 err connect_and_enter_hid(UART_HandleTypeDef* pHandle);
+err bt_do_wiggle(void);
+
 err is_bt_module_connected(UART_HandleTypeDef* pHandle);
 
 void switch_remote(uint16_t sel);
-uint8_t update_remote();
-
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* PROGRAM_INC_BTAPI_H_ */
-
-
-
-
-
-void mouse_command(UART_HandleTypeDef* pHandle, uint8_t buttons, uint8_t x, uint8_t y);
-
-err resetRN42(btCommander* pUartCmder);
-err enterCmdModeValidate(UART_HandleTypeDef *pHandle, btCommander *pUartCmder);
-err enterDeviceSearch(UART_HandleTypeDef *pHandle, btCommander *pUartCmder);
-err enterHID(UART_HandleTypeDef *pHandle, btCommander *pUartCmder);
-err mouseWiggle(btCommander* pUartCmder);

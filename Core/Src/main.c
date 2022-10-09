@@ -161,16 +161,14 @@ int main(void)
 
   /* Create the thread(s) */
   /* definition and creation of defaultTask */
-//  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
-//  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-  osThreadDef(wiggleTask, StartWiggleTask, osPriorityNormal, 1, 512);
+  osThreadDef(wiggleTask, StartWiggleTask, osPriorityNormal, 1, 2048);
   wiggleTaskHandle = osThreadCreate(osThread(wiggleTask), NULL);
 
-  osThreadDef(connectTask, StartBTConnectTask, osPriorityNormal, 1, 2048);
-  connectBtTaskHandle = osThreadCreate(osThread(connectTask), NULL);
   /* USER CODE END RTOS_THREADS */
 
   /* Start scheduler */
@@ -417,7 +415,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : PE10 */
   GPIO_InitStruct.Pin = GPIO_PIN_10;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
@@ -459,38 +457,63 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 void StartWiggleTask(void const * argument)
 {
 	uint16_t secRuns = 60 * 9;
+    err connectStatus = NC_INVALID;
 //	 secRuns = 30;
 	uint16_t secRun  = 0;
     char buffer[18];
     char subbuf[18];
+
+    toggle = HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_10);
   /* Infinite loop */
   for(;;)
   {
     osDelay(1000);
-    toggle = HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_10);
 
-    if (!toggle)
+    if(!toggle)
     {
         SSD1306_Clear();
         snprintf(buffer, sizeof(buffer), "Idle");
         print_oled(OLED_DATA, buffer);
         osDelay(1000);
+        secRun = 0;
         continue;
     }
 
-    if(secRun)
+    inputSelect = (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_7) == GPIO_PIN_SET)) << 0 |
+                  (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_8) == GPIO_PIN_SET)) << 1 |
+                  (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_9) == GPIO_PIN_SET)) << 2; // |
+                //   (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_10) == GPIO_PIN_SET)) << 3;
+
+    if ( connectStatus != NC_COMPLETE )
     {
-    	secRun--;
-        snprintf(buffer, sizeof(buffer), "Next Wiggle: % 4d", secRun);
-        print_oled(OLED_DATA, buffer);
+    	connectStatus = connect_and_enter_hid(&huart1);
+        print_oled(OLED_INFO, "Initializing BT");
+        if (connectStatus == NC_ERROR)
+        {
+            print_oled(OLED_INFO, "Connect Failed");
+        }
+        else if (connectStatus == NC_COMPLETE)
+        {
+            print_oled(OLED_INFO, "BT Connected");
+        }
     }
-    else if(bt_do_wiggle())
-	{
-		secRun = secRuns;
-        char* addr = get_remote_address();
-        snprintf(subbuf, sizeof(subbuf), "ADR:%.12s", addr);
-        print_oled(OLED_SUBDATA, subbuf);
-	}
+    else
+    {
+        if(secRun)
+        {
+            secRun--;
+            snprintf(buffer, sizeof(buffer), "Next Wiggle: % 4d", secRun);
+            print_oled(OLED_DATA, buffer);
+        }
+        else
+        {
+            bt_do_wiggle();
+            secRun = secRuns;
+            char* addr = get_remote_address();
+            snprintf(subbuf, sizeof(subbuf), "ADR:%.12s", addr);
+            print_oled(OLED_SUBDATA, subbuf);
+        }
+    }
 
   }
 }
@@ -504,8 +527,6 @@ void StartBTConnectTask(void const * argument)
     uint16_t inputSelectLast = 0;
     err status = NC_ERROR;
 
-    btState machineState, lastState;
-    lastState = BT_INVALID;
   for(;;)
   {
     toggle = HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_10);
@@ -521,27 +542,13 @@ void StartBTConnectTask(void const * argument)
                   (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_9) == GPIO_PIN_SET)) << 2; // |
                 //   (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_10) == GPIO_PIN_SET)) << 3;
 
-    if ( inputSelect != inputSelectLast )
-	{
-		inputSelectLast = inputSelect;
-		switch_remote(inputSelect);
-		set_bt_state(BT_INITIALIZED);
-	}
-
-    if ( is_bt_module_connected(&huart1) != NC_SUCCESS )
+    if ( status != NC_COMPLETE )
     {
+    	status = connect_and_enter_hid(&huart1);
         print_oled(OLED_INFO, "Initializing BT");
-        status = connect_and_enter_hid(&huart1);
         if (status == NC_ERROR)
         {
             print_oled(OLED_INFO, "Connect Failed");
-        }
-        else
-        {
-            print_oled(OLED_INFO, "BT HID Active");
-            nextRemote = get_desired_remote_address();
-			snprintf(buffer, sizeof(buffer), "DADR:%.12s", nextRemote);
-            print_oled(OLED_BOTTOM, buffer);
         }
     }
     else
@@ -550,6 +557,7 @@ void StartBTConnectTask(void const * argument)
     }
   }
 }
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -568,108 +576,6 @@ void StartDefaultTask(void const * argument)
     {
         osDelay(1000);
     }
- #if 0
-  /* Infinite loop */
-  for(;;)
-  {
-    toggle = HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_10);
-
-    if(!toggle)
-    {
-        osDelay(1000);
-        continue;
-    }
-
-    inputSelect = (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_7) == GPIO_PIN_SET)) << 0 |
-                  (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_8) == GPIO_PIN_SET)) << 1 |
-                  (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_9) == GPIO_PIN_SET)) << 2; // |
-                //   (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_10) == GPIO_PIN_SET)) << 3;
-
-#if 1
-    if ( is_bt_module_connected(&huart1) != NC_SUCCESS )
-    {
-        print_oled(OLED_INFO, "Initializing BT");
-        status = connect_and_enter_hid(&huart1);
-        if (status == NC_ERROR)
-        {
-            print_oled(OLED_INFO, "Connect Failed");
-        }
-        else
-        {
-            print_oled(OLED_INFO, "BT HID Active");
-            nextRemote = get_desired_remote_address();
-			snprintf(buffer, sizeof(buffer), "DADR:%.12s", nextRemote);
-            print_oled(OLED_BOTTOM, buffer);
-        }
-    }
-    else
-    {
-        osDelay(5000);
-    }
-    
-#else
-	if ( inputSelect != inputSelectLast )
-	{
-		inputSelectLast = inputSelect;
-		switch_remote(inputSelect);
-		set_bt_state(BT_INITIALIZED);
-	}
-
-    lastState = machineState;
-    machineState = get_bt_state();
-    status = bt_start_task(&huart1);
-
-    if (status == NC_ERROR)
-    {
-        print_oled(OLED_DATA, "ERR");
-    }
-
-    if ( machineState != lastState )
-    {
-    switch (machineState)
-    {
-        case BT_INITIALIZED:
-            print_oled(OLED_INFO, "Initialized");
-            nextRemote = get_desired_remote_address();
-            snprintf(buffer, sizeof(buffer), "DADR:%.12s", nextRemote);
-            print_oled(OLED_BOTTOM, buffer);
-            break;
-        case BT_CMD_MODE:
-            print_oled(OLED_INFO, "CMD");
-            break;
-        case BT_READY:
-            print_oled(OLED_INFO, "Ready");
-            break;
-        case BT_PRINT_UART:
-            print_oled(OLED_INFO, "Print UART");
-            break;
-        case BT_ENTER_HID:
-			print_oled(OLED_INFO, "Set HID");
-			break;
-        case BT_HID_MODE:
-            addr = get_remote_address();
-            snprintf(buffer, sizeof(buffer), "ADR:%.12s", addr);
-            print_oled(OLED_SUBDATA, buffer);
-            print_oled(OLED_INFO, "HID Mode");
-            break;
-        case BT_SPP_MODE:
-            print_oled(OLED_INFO, "SPP Mode");
-            break;
-        case BT_SEARCH_CONNECT:
-            print_oled(OLED_INFO, "Search Connect");
-            break;
-        case BT_CONNECT:
-            print_oled(OLED_INFO, "Connect");
-            break;
-        default:
-            break;
-        }
-    }
-	osDelay(1000);
-#endif
-
-  }
-#endif
   /* USER CODE END 5 */
 }
 

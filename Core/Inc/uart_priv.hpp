@@ -1,22 +1,32 @@
 #include <uart.h>
 #include <ncerr.h>
+#include <string>
+#include <cstring>
 
-typedef void (*registerRxCallback)(uint8_t* pBuff);
-constexpr uint32_t STREAM_BUFF_SIZE = 512;
+#ifndef CORE_INC_UART_PRIV_HPP
+#define CORE_INC_UART_PRIV_HPP
+
+typedef void (*registerRxCallback)(UART_HandleTypeDef *huart, uint16_t Size);
+constexpr uint32_t STREAM_BUFF_SIZE = 256;
 
 class RxTxMachine
 {
     private:
-    UART_HandleTypeDef *pHandle;
-    uint8_t* pBuffer;
     size_t sizeBuffer;
 
     uint8_t data[STREAM_BUFF_SIZE];
+    uint8_t oldData[STREAM_BUFF_SIZE]; // extremely inelegant way to know where the streamed data stops
 
     uint8_t retryCount = 5;
     uint16_t retryDelay = 100;
     char * strFind;
+
+    
+
     public:
+    std::string retstr;
+    uint8_t* pBuffer = data;
+    UART_HandleTypeDef *pHandle;
 
     registerRxCallback pCallback;
 
@@ -26,6 +36,8 @@ class RxTxMachine
         return this->flags.rxBuffRunning;
     }
 
+    std::string get_return_message(std::string search);
+
     union uartFlags
     {
         struct
@@ -33,26 +45,46 @@ class RxTxMachine
             uint8_t intHit : 1;
             uint8_t rxBuffRunning : 1;
             uint8_t countUnaligned : 1;
-            uint8_t reserved : 5;
+            uint8_t initialized : 1;
+            uint8_t reserved : 4;
         };
         uint8_t all;
     } flags;
     
 
-    RxTxMachine(UART_HandleTypeDef* handle, uint8_t* buffer, registerRxCallback callback)
+    RxTxMachine(UART_HandleTypeDef* handle, uint8_t* buffer)
     {
         pHandle = handle;
         pBuffer = buffer;
         sizeBuffer = sizeof(buffer);
-        pCallback = callback;
         flags.all = 0;
+        flags.initialized = 1;
+        strFind = "\r\n";        
+    }
+
+    RxTxMachine(UART_HandleTypeDef* handle)
+    {
+        pHandle = handle;
+        sizeBuffer = 0;
+        flags.all = 0;
+        flags.initialized = 1;
         strFind = "\r\n";
+    }
+
+    RxTxMachine()
+    {
+        flags.all = 0;
     }
 
     ~RxTxMachine()
     {
 
     }
+
+    err         send_rec_val_uart_message(std::string msgTx, std::string msgVal);
+    std::string send_rec_uart_message(std::string msg, std::string search);
+    err         send_uart_message(std::string msgTx);
+    err         send_uart_byte(uint8_t* msgTx);
 
     void reset_buffer_ptr() { this->sizeBuffer = 0; }
 
@@ -61,15 +93,9 @@ class RxTxMachine
     void set_uart_handle(UART_HandleTypeDef* handle) { this->pHandle = handle; }
 
     void print_uart();
-
-    err     send_rec_val_uart_message(const char* msgTx, const char* msgVal);
-    char*   send_rec_uart_message(size_t msgSize, const char* msg);
-    char*   send_rec_uart_message(const char* msg, const char* search);
-    err     send_rec_print_uart(const char* msgTx, const char* strFind);
-    HAL_StatusTypeDef send_uart_message(const char* mes);
-
-    HAL_StatusTypeDef   send_uart_message(UART_HandleTypeDef *pHandle, const char* mes);
-    HAL_StatusTypeDef   get_uart_message(UART_HandleTypeDef *pHandle, uint8_t* pBuff, size_t msgSize=BUFF_SIZE, uint8_t print=1);
 };
 
 void set_active_machine(RxTxMachine *ptr);
+
+
+#endif

@@ -4,9 +4,11 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <cstring>
+#include <string>
 #include "cmsis_os.h"
 #include "ncerr.h"
 #include "stm32f4xx_hal.h"
+#include "stm32f4xx_hal_uart.h"
 
 constexpr uint32_t UART_TX_TIMEOUT = 1000;
 constexpr uint32_t UART_RX_TIMEOUT = 1000;
@@ -26,6 +28,8 @@ void set_active_machine(RxTxMachine *ptr)
 {
     activePointer = ptr;
 }
+
+
 
 void print_used_scratch_pointer()
 {
@@ -70,7 +74,33 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
     printf("Rx Event Callback hit\n");
 }
 
-HAL_StatusTypeDef   RxTxMachine::start_uart_stream()
+std::string RxTxMachine::get_return_message(std::string search)
+{
+    retstr.clear();
+
+    uint8_t* pChar;
+
+    if (this->flags.intHit)
+    {
+        retstr.append((const char*)this->pBuffer, (STREAM_BUFF_SIZE - this->sizeBuffer));
+        this->sizeBuffer = 0;
+        this->pBuffer = this->data;
+    }
+
+    pChar = (uint8_t*)strstr((const char*)this->pBuffer, search.c_str());
+
+    if(pChar)
+    {
+        uint16_t inc = (pChar - (uint8_t*)this->pBuffer) + search.size();
+        retstr.append((const char*)this->pBuffer, inc);
+        this->pBuffer += inc;
+        this->sizeBuffer += inc;
+    }
+
+    return retstr;
+}
+
+HAL_StatusTypeDef RxTxMachine::start_uart_stream()
 {
     auto retval = HAL_UART_Receive_DMA(this->pHandle, this->data, sizeof(this->data));
 
@@ -82,112 +112,84 @@ HAL_StatusTypeDef   RxTxMachine::start_uart_stream()
     return retval;
 }
 
-char* RxTxMachine::send_rec_uart_message(size_t msgSizeRx, const char* msg)
+err RxTxMachine::send_rec_val_uart_message(std::string msgTx, std::string msgVal)
 {
-    size_t msgSizeTx = strlen(msg);
-
-    if (!is_rx_dma_running())
-	{
-		start_uart_stream();
-	}
-
-    this->pBuffer = this->data + this->sizeBuffer;
-
-    HAL_UART_Transmit(this->pHandle, (const uint8_t*)msg, msgSizeTx, UART_TX_TIMEOUT);
-
-    osDelay(100);
-
-    this->sizeBuffer += msgSizeRx;
-
-    return (char*)this->pBuffer;
-}
-
-char* RxTxMachine::send_rec_uart_message(const char* msg, const char* str)
-{
-    size_t msgSizeTx = strlen(msg);
-    uint16_t savedIdx = this->sizeBuffer;
-    uint16_t findcount = 0;
-	uint16_t findMax = strlen(this->strFind);
-
-    if (!is_rx_dma_running())
-	{
-		start_uart_stream();
-	}
-
-    this->pBuffer = this->data + this->sizeBuffer;
-
-    HAL_UART_Transmit(this->pHandle, (const uint8_t*)msg, msgSizeTx, UART_TX_TIMEOUT);
-
-    osDelay(100);
-    
-    for (; this->sizeBuffer < STREAM_BUFF_SIZE; this->sizeBuffer++)
-    {
-        printf("%c", this->data[this->sizeBuffer]);
-        if (this->data[this->sizeBuffer] == str[findcount])
-        {
-            findcount++;
-            if (findcount == findMax)
-            {
-                this->sizeBuffer++;
-                break;
-            }
-        }
-        else if (findcount)
-        {
-        	findcount = 0;
-        }
-    }
-    if (this->flags.intHit)
-    {
-        for (this->sizeBuffer = 0; this->sizeBuffer < savedIdx; this->sizeBuffer++)
-        {
-            printf("%c", this->data[this->sizeBuffer]);
-            if (this->data[this->sizeBuffer] == str[findcount])
-            {
-                findcount++;
-                if (findcount == findMax)
-                {
-                    this->flags.intHit = 0;
-                    this->sizeBuffer++;
-                    break;
-                }                
-            }
-        }
-    }
-
-    return (char*)this->pBuffer;
-}
-
-err RxTxMachine::send_rec_val_uart_message(const char* msgTx, const char* msgVal)
-{
-    size_t msgSizeTx = strlen(msgTx);
-    size_t msgSizeVal = strlen(msgVal);
-
     if (!is_rx_dma_running())
     {
         start_uart_stream();
     }
 
-    auto status = HAL_UART_Transmit(this->pHandle, (const uint8_t*)msgTx, msgSizeTx, UART_TX_TIMEOUT);
+    auto status = HAL_UART_Transmit(this->pHandle, (const uint8_t*)msgTx.c_str(), msgTx.size(), UART_TX_TIMEOUT);
+
+    osDelay(100);
 
     if (status != HAL_OK)
     {
         return NC_ERROR;
     }
-
-    this->pBuffer = this->data + this->sizeBuffer;
-    this->sizeBuffer += msgSizeVal;
-
-    for (auto retry = this->retryCount; retry > 0; retry--)
+    
+    for (auto i = 0; i < this->retryCount; i++)
     {
-        if (!memcmp(this->pBuffer, msgVal, msgSizeVal))
+        this->get_return_message(msgVal);
+
+        if(!retstr.empty())
         {
-            return NC_SUCCESS;
+            if (msgVal.compare(retstr) == 0)
+                return NC_SUCCESS;
         }
-        osDelay(this->retryDelay);
+    }
+
+    return NC_ERROR;
+}
+
+std::string RxTxMachine::send_rec_uart_message(std::string msg, std::string search)
+{
+    std::string retstr;
+
+    if (!is_rx_dma_running())
+	{
+		start_uart_stream();
+	}
+
+    HAL_UART_Transmit(this->pHandle, (const uint8_t*)msg.c_str(), msg.size(), UART_TX_TIMEOUT);
+
+    osDelay(100);
+
+    return this->get_return_message(search);
+}
+
+err RxTxMachine::send_uart_message(std::string msgTx)
+{
+    if (!is_rx_dma_running())
+    {
+        start_uart_stream();
+    }
+
+    auto status = HAL_UART_Transmit(this->pHandle, (const uint8_t*)msgTx.c_str(), msgTx.size(), UART_TX_TIMEOUT);
+
+    if (status != HAL_OK)
+    {
+        return NC_ERROR;
     }
     
-    return NC_ERROR;
+    return NC_SUCCESS;
+}
+
+err RxTxMachine::send_uart_byte(uint8_t* msgTx)
+{
+    if (!is_rx_dma_running())
+    {
+        start_uart_stream();
+    }
+
+    auto status = HAL_UART_Transmit(this->pHandle, (const uint8_t*)msgTx, 1, UART_TX_TIMEOUT);
+
+    if (status != HAL_OK)
+    {
+        return NC_ERROR;
+    }
+    
+    return NC_SUCCESS;
 }
 
 void RxTxMachine::print_uart()
@@ -233,77 +235,4 @@ void RxTxMachine::print_uart()
         }
     }
     printf("\n-----------------------\n");
-}
-
-err RxTxMachine::send_rec_print_uart(const char* msgTx, const char* strFind)
-{
-    size_t msgSizeTx = strlen(msgTx);
-
-    if (msgTx[msgSizeTx-1] == 0)
-        msgSizeTx--;
-
-    if (!is_rx_dma_running())
-	{
-		start_uart_stream();
-	}
-
-    HAL_UART_Transmit(this->pHandle, (const uint8_t*)msgTx, msgSizeTx, UART_TX_TIMEOUT);
-
-    this->flags.countUnaligned = 1;
-    this->strFind = (char*)strFind;
-
-    return NC_NO_ERROR;
-} 
-
-HAL_StatusTypeDef get_uart_message(UART_HandleTypeDef *pHandle, uint8_t* pBuff, size_t msgSize, uint8_t print)
-{
-    memset(pBuff, 0, msgSize);        
-//    auto retval = HAL_UART_Receive(pHandle, pCmder->pBuff, msgSize, UART_RX_TIMEOUT);
-    auto retval = HAL_UART_Receive_DMA(pHandle, pBuff, msgSize);
-    // auto retval = HAL_UART_Receive_IT(pHandle, pBuff, msgSize);
-    // auto retval = UART_Start_Receive_DMA(pHandle, pBuff, msgSize);
-
-
-
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);
-    return retval;
-}
-
-HAL_StatusTypeDef RxTxMachine::send_uart_message(const char* mes)
-{
-    size_t msgSize = strlen(mes);
-    if (mes[msgSize-1] == 0) 
-        msgSize--;
-
-    auto status = HAL_UART_Transmit(this->pHandle, (const uint8_t*)mes, msgSize, UART_TX_TIMEOUT);
-
-#ifdef DEBUG
-    osDelay(100);
-#endif
-    return status;
-}
-
-HAL_StatusTypeDef send_uart_message(UART_HandleTypeDef *pHandle, const char* mes)
-{
-    size_t msgSize = strlen(mes);
-    if (mes[msgSize-1] == 0) 
-        msgSize--;
-
-    auto status = HAL_UART_Transmit(pHandle, (const uint8_t*)mes, msgSize, UART_TX_TIMEOUT);
-#ifdef DEBUG
-    osDelay(100);
-#endif
-    return status;
-}
-
-uint8_t is_ret_msg_valid(uint8_t * pBuff, const char* msg)
-{
-    size_t msgSize = strlen(msg);
-
-    for (size_t i = 0; i < msgSize; i++)
-    {
-        if (pBuff[i] != msg[i])
-            return 0;
-    }
-    return 1;
 }
