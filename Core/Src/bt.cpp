@@ -5,13 +5,12 @@
 #include "cmsis_os.h"
 
 //*****************************************************************************
-// RN42 Class
+// HID Commands
 //*****************************************************************************
 
 void RN42::mouse_command(uint8_t buttons, uint8_t x, uint8_t y)
 {
     uint8_t buffer[] = { 0xFD, 0x05, 0x02, buttons, x, y, 0x00 };
-    const char* pBuff = (const char*)buffer;
     for( uint8_t b : buffer)
     {
         this->uart->send_uart_byte(&b);
@@ -23,6 +22,10 @@ err RN42::soft_reset()
 {
     return this->uart->send_rec_val_uart_message("R,1", "Reboot!\r\n");
 }
+
+//*************************************************************************
+// State Confirmation checks
+//*************************************************************************
 
 std::string RN42::get_remote_connected()
 {
@@ -51,7 +54,7 @@ err RN42::is_connected()
 
 
 //*****************************************************************************
-// BT Common and state machines
+// State Machine Handlers
 //*****************************************************************************
 
 err RN42::process(msg* data)
@@ -116,8 +119,16 @@ err RN42::state_process(msg* data)
         case BTState::BT_CONNECT:
             if (data)
             {
-                std::string rmt((const char*)data->data, data->len);
-                status = connect_new_remote(rmt);
+                if (data->len == 1)
+                {
+                    uint16_t idx = (uint16_t)(*data->data);
+                    status = connect_new_remote(remotes[idx]);   
+                }
+                else
+                {
+                    std::string rmt((const char*)data->data, data->len);
+                    status = connect_new_remote(rmt);
+                }
             }
             else
             {
@@ -131,10 +142,11 @@ err RN42::state_process(msg* data)
         case BTState::BT_CMD_MODE:
         break;
         case BTState::BT_HID_MODE:
-            status = this->enter_hid_mode();
+            status = this->enter_hid_mouse_mode();
         break;
         case BTState::BT_SPP_MODE:
-            status = this->enter_spp_mode();
+        	status = this->enter_pairing();
+//            status = this->enter_spp_mode();
         break;
     }
     return status;
@@ -165,11 +177,15 @@ err RN42::state_end(msg* data)
             ;
         break;
         case BTState::BT_SPP_MODE:
-            ;
+            this->hard_reset();
         break;
     }
     return status;
 }
+
+//*****************************************************************************
+// Private Helper Functions
+//*****************************************************************************
 
 template<uint16_t N>
 err RN42::send_command_sequence(btCmd<N>* cmds, uint16_t interCmdDelay, std::string error)
@@ -191,6 +207,15 @@ err RN42::send_command_sequence(btCmd<N>* cmds, uint16_t interCmdDelay, std::str
     return status;
 }
 
+std::string RN42::send_cmd_get_resp(std::string cmd, std::string term, uint16_t repeat)
+{
+    return this->uart->send_rec_uart_message( cmd, term);
+}
+
+//*****************************************************************************
+// Bluetooth Modes
+//*****************************************************************************
+
 err RN42::enter_command_mode()
 {
     err status = this->send_command_sequence(&this->enterCmd, 1000);
@@ -198,9 +223,14 @@ err RN42::enter_command_mode()
     return status;
 }
 
-err RN42::enter_hid_mode()
+err RN42::enter_hid_mouse_mode()
 {
-    return this->send_command_sequence(&this->enterHID);
+    return this->send_command_sequence(&this->enterMouseHID);
+}
+
+err RN42::enter_pairing()
+{
+   return this->send_command_sequence(&this->enterPair, 1000); 
 }
 
 //*****************************************************************************
@@ -244,3 +274,15 @@ err RN42::connect_new_remote(std::string str)
     delete(&connect);
     return status;
 }
+
+//*****************************************************************************
+// BT Information Reporting
+//*****************************************************************************
+
+// std::string get_remote()
+// {
+//     std::string cmd = "GR\r";
+//     std::string resp = send_cmd_get_resp(cmd, "\r\n");
+//     delete(&cmd);
+//     return resp;
+// }

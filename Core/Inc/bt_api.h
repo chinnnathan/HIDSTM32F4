@@ -26,13 +26,14 @@ typedef enum {
 	BT_RESET
 } btCommand;
 
-const char * get_remote_address();
+char * get_remote_address();
 const char * get_desired_remote_address();
 
 err connect_and_enter_hid(UART_HandleTypeDef* pHandle);
 err bt_do_wiggle(void);
 
 err is_bt_module_connected();
+void set_active_bt_module(uint16_t uid, UART_HandleTypeDef* pHandle);
 
 void switch_remote(uint16_t sel);
 

@@ -43,23 +43,30 @@ class RN42
     GPIO_TypeDef *gpioStatus = GPIOE;
 	uint16_t      gpioStatusPin = GPIO_PIN_0;
 
-	btCmd<4> enterHID =
+    btCmd<5> enterMouseHID =
 	{
-		.rec = { "AOK\r\n", "AOK\r\n", "AOK\r\n", "Reboot!\r\n"},
-		.send = { "S~,6\r", "SH,0220\r", "SM,0\r", "R,1\r"}
+		.rec =  { "AOK\r\n", "AOK\r\n",   "AOK\r\n", "AOK\r\n", "Reboot!\r\n"},
+		.send = { "S~,6\r",  "SH,0223\r", "SM,6\r",  "SA,1\r",  "R,1\r"}
 	};
 
-	btCmd<1> enterCmd =
+    btCmd<1> enterCmd =
 	{
 		.rec = {"CMD\r\n"},
 		.send = {"$$$"},
 	};
+
+    btCmd<4> enterPair =
+    {
+        .rec =  { "AOK\r\n", "AOK\r\n", "AOK\r\n", "Reboot!\r\n"},
+		.send = { "S~,0\r",  "SA,0\r",  "SM,0\r",   "R,1\r"}
+    };
 
     //*************************************************************************
     // Private Helper Functions
     //*************************************************************************
     template<uint16_t N>
     err send_command_sequence(btCmd<N>* cmds, uint16_t interCmdDelay=100, std::string error="?\r\n");
+    std::string send_cmd_get_resp(std::string cmd, std::string term="\r\n", uint16_t repeat = 1);
 
     protected:
     UART_HandleTypeDef *pHandle;
@@ -74,6 +81,15 @@ class RN42
     RN42(RxTxMachine *handle)
     {
         uart = handle;
+    }
+
+    RN42(RxTxMachine *handle, GPIO_TypeDef* status, uint16_t statusPin, GPIO_TypeDef* reset, uint16_t resetPin)
+    {
+        uart = handle;
+        gpioStatus = status;
+        gpioStatusPin = statusPin;
+        gpioReset = reset;
+        gpioResetPin = resetPin;
     }
 
     ~RN42(){}
@@ -92,18 +108,27 @@ class RN42
     BTState get_state() { return this->state; }
 
     //*************************************************************************
-    // Bluetooth common commands
+    // Bluetooth General Modes
     //*************************************************************************
     void hard_reset();
     err soft_reset();
     err enter_command_mode();
-    err enter_hid_mode();
+    err enter_hid_mouse_mode();
     err enter_spp_mode() {return NC_SUCCESS; }
+    err enter_pairing();
+
+    //*************************************************************************
+    // HID Commands
+    //*************************************************************************
+    void mouse_command(uint8_t buttons, uint8_t x, uint8_t y);
+
+    //*************************************************************************
+    // Connection Handlers
+    //*************************************************************************
     err connect_stored_remote();
     err connect_new_remote(std::string);
     err connect_new_remote();
-
-    void mouse_command(uint8_t buttons, uint8_t x, uint8_t y);
+    err disconnect();
 
     //*************************************************************************
     // State Confirmation checks
@@ -111,6 +136,11 @@ class RN42
 	std::string get_remote_connected();
     err is_connected();
 
+    //*************************************************************************
+    // Information Reporting
+    //*************************************************************************
+    std::string get_remote();
+    std::string get_inq();
 };
 
 #endif

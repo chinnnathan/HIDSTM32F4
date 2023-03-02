@@ -1,3 +1,6 @@
 Debug/
 .settings/
 "MouseWiggle Debug Active.launch"
+MouseWiggle.ioc
+.metadata/*
+STM32F407VETX_FLASH.ld

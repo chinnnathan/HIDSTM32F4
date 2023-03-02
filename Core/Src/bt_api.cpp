@@ -21,10 +21,19 @@
 
 namespace
 {
+    RN42* pBtModule;
     RxTxMachine uartMachine;
-    RN42 btModule(&uartMachine);
+    RxTxMachine uartMachine1;
+    RxTxMachine* pUartMachine;
+    RN42 btModule0(&uartMachine, GPIOE, GPIO_PIN_0, GPIOE, GPIO_PIN_1);
+    RN42 btModule1(&uartMachine1, GPIOD, GPIO_PIN_2, GPIOD, GPIO_PIN_3);
     std::vector<std::string> rm = { "001A7DDA7115", "60E32B7AB47F", "A0A4C5965153" };
     uint16_t remoteIdx = 0;
+    msg sendMsg = 
+    {
+        .data = nullptr,
+        .len = 0,
+    };
     /*
     A0A4C5965153,NCHINN-MOBL2,2A010C
     60E32B7AB47F,AP-J5MN2J3,2A010C
@@ -32,6 +41,26 @@ namespace
     Inquiry Done
     */
 };
+
+void set_active_bt_module(uint16_t uid, UART_HandleTypeDef* pHandle)
+{
+    if (uid == 0)
+    {
+        pBtModule = &btModule0;
+        uartMachine.set_uart_handle(pHandle);
+        pUartMachine = &uartMachine;
+    }
+    else if (uid == 1)
+    {
+        pBtModule = &btModule1;
+        uartMachine1.set_uart_handle(pHandle);
+        pUartMachine = &uartMachine1;
+    }
+    else if (uid == 2)
+    {
+        
+    }
+}
 
 void switch_remote(uint16_t sel)
 {
@@ -51,9 +80,9 @@ void switch_remote(uint16_t sel)
 
 }
 
-const char * get_remote_address()
+char * get_remote_address()
 {
-    return btModule.remotes[remoteIdx].c_str();
+    return (char*)pBtModule->remotes[remoteIdx].c_str();
     // auto status = uartMachine.send_rec_val_uart_message("$$$", "CMD\r\n");
 
     // char* retval = uartMachine.send_rec_uart_message(14, "GR\r");
@@ -64,30 +93,29 @@ const char * get_remote_address()
 
 const char * get_desired_remote_address()
 {
-    return btModule.remotes[remoteIdx].c_str();
+    return pBtModule->remotes[remoteIdx].c_str();
 }
 
 err connect_and_enter_hid(UART_HandleTypeDef* pHandle)
 {
     err status = NC_NO_ERROR;
 
-    switch (btModule.get_state())
+    switch (pBtModule->get_state())
     {
         case BTState::BT_INVALID:
             printf("Enter Invalid state\r\n");
             print_oled(OLED_BOTTOM, "BT Initialize");
-            uartMachine.set_uart_handle(pHandle);
-		    uartMachine.start_uart_stream();
-            btModule.remotes = rm;
-            btModule.set_next_state(BTState::BT_READY);
-            status = btModule.process();
+		    pUartMachine->start_uart_stream();
+            pBtModule->remotes = rm;
+            pBtModule->set_next_state(BTState::BT_READY);
+            status = pBtModule->process();
             status = NC_NO_ERROR;
         break;
         case BTState::BT_READY:
             printf("Enter Ready state\r\n");
             print_oled(OLED_BOTTOM, "BT Ready");
-            btModule.set_next_state(BTState::BT_CMD_MODE);
-            status = btModule.process();
+            pBtModule->set_next_state(BTState::BT_CMD_MODE);
+            status = pBtModule->process();
             status = NC_NO_ERROR;
         break;
         case BTState::BT_GET_INFO:
@@ -97,14 +125,16 @@ err connect_and_enter_hid(UART_HandleTypeDef* pHandle)
         case BTState::BT_CMD_MODE:
             printf("Enter Command state\r\n");
             print_oled(OLED_BOTTOM, "BT Enter Cmd");
-            btModule.set_next_state(BTState::BT_HID_MODE);
-            status = btModule.process();
+            pBtModule->set_next_state(BTState::BT_HID_MODE);
+            status = pBtModule->process();
         break;
         case BTState::BT_HID_MODE:
             printf("Enter HID state\r\n");
             print_oled(OLED_BOTTOM, "BT HID Set");
-            btModule.set_next_state(BTState::BT_CONNECT);
-			status = btModule.process();
+            pBtModule->set_next_state(BTState::BT_CONNECT);
+            sendMsg.data = (uint8_t*)(&remoteIdx);
+            sendMsg.len = 1;
+			status = pBtModule->process(&sendMsg);
 			if (status == NC_SUCCESS)
 			{
 				status = NC_COMPLETE;
@@ -112,12 +142,15 @@ err connect_and_enter_hid(UART_HandleTypeDef* pHandle)
         break;
         case BTState::BT_SPP_MODE:
             printf("Enter SPP state\r\n");
+            print_oled(OLED_BOTTOM, "BT Connect");
+		    pBtModule->set_next_state(BTState::BT_SPP_MODE);
+		    status = pBtModule->process();
         break;
         case BTState::BT_CONNECT:
 		   printf("Enter Connect state\r\n");
            print_oled(OLED_BOTTOM, "BT Connect");
-		   btModule.set_next_state(BTState::BT_READY);
-		   status = btModule.process();
+		   pBtModule->set_next_state(BTState::BT_READY);
+		   status = pBtModule->process();
 	    break;
     }
 
@@ -126,14 +159,14 @@ err connect_and_enter_hid(UART_HandleTypeDef* pHandle)
 
 err bt_do_wiggle(void)
 {
-    for(auto i = 0; i < 5; i++)
+    for(auto i = 0; i < 2; i++)
 	{
-        btModule.mouse_command(0,50,50);
+        pBtModule->mouse_command(0,50,50);
 		osDelay(50);
 	}
-	for(auto i = 0; i < 5; i++)
+	for(auto i = 0; i < 2; i++)
 	{
-        btModule.mouse_command(0,-50,-50);
+        pBtModule->mouse_command(0,-50,-50);
 		osDelay(50);
 	}
 
@@ -142,5 +175,5 @@ err bt_do_wiggle(void)
 
 err is_bt_module_connected()
 {
-    return btModule.is_connected();
+    return pBtModule->is_connected();
 }

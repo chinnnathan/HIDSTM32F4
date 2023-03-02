@@ -50,12 +50,12 @@ UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 DMA_HandleTypeDef hdma_usart1_rx;
+DMA_HandleTypeDef hdma_usart2_rx;
 
 osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
 
 osThreadId wiggleTaskHandle;
-osThreadId connectBtTaskHandle;
 uint16_t inputSelect = 0;
 volatile uint16_t toggle;
 
@@ -97,7 +97,6 @@ void StartDefaultTask(void const * argument);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 void StartWiggleTask(void const * argument);
-void StartBTConnectTask(void const * argument);
 
 /* USER CODE END 0 */
 
@@ -166,7 +165,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-  osThreadDef(wiggleTask, StartWiggleTask, osPriorityNormal, 1, 2048);
+  osThreadDef(wiggleTask, StartWiggleTask, osPriorityAboveNormal, 1, 2048);
   wiggleTaskHandle = osThreadCreate(osThread(wiggleTask), NULL);
 
   /* USER CODE END RTOS_THREADS */
@@ -368,8 +367,12 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
   /* DMA2_Stream2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
@@ -395,7 +398,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_3, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_1, GPIO_PIN_RESET);
@@ -419,11 +422,17 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PD0 PD1 PD2 PD3 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3;
+  /*Configure GPIO pins : PD0 PD1 PD3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_3;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PD2 */
+  GPIO_InitStruct.Pin = GPIO_PIN_2;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PE1 */
@@ -456,18 +465,24 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
  */
 void StartWiggleTask(void const * argument)
 {
-	uint16_t secRuns = 60 * 9;
+	uint16_t secRuns = 60 * 8;
     err connectStatus = NC_INVALID;
-//	 secRuns = 30;
 	uint16_t secRun  = 0;
     char buffer[18];
     char subbuf[18];
 
-    uint16_t maxRetry = 50;
+    uint8_t runDelay = 0;
+
+    uint16_t secRunArray[] = {secRun, secRun, secRun};
+
+    uint16_t maxRetry = 2;
     uint16_t screenIdle = 0;
 
     toggle = HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_10);
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_1, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_3, GPIO_PIN_SET);
+    osDelay(50);
   /* Infinite loop */
   for(;;)
   {
@@ -496,86 +511,73 @@ void StartWiggleTask(void const * argument)
                   (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_9) == GPIO_PIN_SET)) << 2; // |
                 //   (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_10) == GPIO_PIN_SET)) << 3;
 
-    if (is_bt_module_connected() != NC_SUCCESS)
+    switch_remote(inputSelect);
+
+    for ( uint16_t i = 0; i < 3; i++ )
     {
-    	connectStatus = connect_and_enter_hid(&huart1);
-        print_oled(OLED_INFO, "Initializing BT");
-        if (connectStatus == NC_ERROR)
+        if ( (inputSelect & (1 << i) ) == 0 )
         {
-            print_oled(OLED_INFO, "Connect Failed");
+            continue;
         }
-        else if (connectStatus == NC_COMPLETE)
+
+        switch (i)
         {
-            for(uint16_t i = 0; i < maxRetry; i++)
+        case 0:
+            set_active_bt_module(i, &huart1);
+            break;
+        case 1:
+            set_active_bt_module(i, &huart2);
+        default:
+            break;
+        }
+
+
+        if (is_bt_module_connected() != NC_SUCCESS)
+        {
+            connectStatus = connect_and_enter_hid(&huart1);
+            print_oled(OLED_INFO, "Initializing BT");
+            if (connectStatus == NC_ERROR)
             {
-                if(is_bt_module_connected() == NC_SUCCESS)
-                {
-                    print_oled(OLED_INFO, "BT Connected");
-                    break;
-                }
-                osDelay(50);
+                print_oled(OLED_INFO, "Connect Failed");
             }
-        }
-    }
-    else
-    {
-        if(secRun)
-        {
-            secRun--;
-            snprintf(buffer, sizeof(buffer), "Next Wiggle: % 4d", secRun);
-            print_oled(OLED_DATA, buffer);
-            osDelay(1000);
+            else if (connectStatus == NC_COMPLETE)
+            {
+                for(uint16_t j = 0; j < maxRetry; j++)
+                {
+                    if(is_bt_module_connected() == NC_SUCCESS)
+                    {
+                        print_oled(OLED_INFO, "BT Connected");
+                        break;
+                    }
+                    osDelay(50);
+                }
+            }
         }
         else
         {
-            bt_do_wiggle();
-            print_oled(OLED_INFO, "BlueTooth Wiggle");
-            secRun = secRuns;
-            char* addr = get_remote_address();
-            snprintf(subbuf, sizeof(subbuf), "ADR:%.12s", addr);
-            print_oled(OLED_SUBDATA, subbuf);
+            if(secRunArray[i])
+            {
+                secRunArray[i]--;
+                snprintf(buffer, sizeof(buffer), "Next Wiggle: % 4d", secRunArray[i]);
+                print_oled(OLED_DATA+i, buffer);
+                runDelay = 1;
+                
+            }
+            else
+            {
+                bt_do_wiggle();
+                print_oled(OLED_INFO, "BlueTooth Wiggle");
+                secRunArray[i] = secRuns;
+                snprintf(subbuf, sizeof(subbuf), "ADR:%.12s", (char*)get_remote_address());
+                print_oled(OLED_SUBDATA, subbuf);
+            }
         }
     }
 
-  }
-}
-
-void StartBTConnectTask(void const * argument)
-{
-	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_1, GPIO_PIN_SET);
-    char buffer[18];
-    char* nextRemote;
-    char* addr;
-    uint16_t inputSelectLast = 0;
-    err status = NC_ERROR;
-
-  for(;;)
-  {
-    toggle = HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_10);
-
-    if(!toggle)
+    if(runDelay)
     {
-        osDelay(1000);
-        continue;
-    }
-
-    inputSelect = (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_7) == GPIO_PIN_SET)) << 0 |
-                  (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_8) == GPIO_PIN_SET)) << 1 |
-                  (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_9) == GPIO_PIN_SET)) << 2; // |
-                //   (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_10) == GPIO_PIN_SET)) << 3;
-
-    if ( status != NC_COMPLETE )
-    {
-    	status = connect_and_enter_hid(&huart1);
-        print_oled(OLED_INFO, "Initializing BT");
-        if (status == NC_ERROR)
-        {
-            print_oled(OLED_INFO, "Connect Failed");
-        }
-    }
-    else
-    {
-        osDelay(5000);
+        runDelay = 0;
+        osDelay(990);
     }
   }
 }
@@ -592,7 +594,7 @@ void StartBTConnectTask(void const * argument)
 void StartDefaultTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
-	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_1, GPIO_PIN_SET);
+
 
     for(;;)
     {
