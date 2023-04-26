@@ -18,6 +18,7 @@
 #define UART_RX_TIMEOUT 1000
 //#define GET_INQ 1
 //#define GET_MODE 1
+constexpr int maxMove = 50;
 
 namespace
 {
@@ -169,6 +170,29 @@ err bt_do_wiggle(void)
         pBtModule->mouse_command(0,-50,-50);
 		osDelay(50);
 	}
+
+    return NC_NO_ERROR;
+}
+
+err bt_do_wiggle_random(RNG_HandleTypeDef *rng)
+{
+    int x[3];
+    int y[3];
+
+    for (int i = 0; i < 3; i++)
+    {
+        x[i] = (HAL_RNG_GetRandomNumber(rng) % maxMove);
+        y[i] = (HAL_RNG_GetRandomNumber(rng) % maxMove);
+
+        pBtModule->mouse_command(0,x[i],y[i]);
+        osDelay(50);
+    }
+
+    for(int i = 0; i < 3; i++)
+    {
+        pBtModule->mouse_command(0,-1 * x[i], -1 *y[i]);
+        osDelay(50);
+    }
 
     return NC_NO_ERROR;
 }

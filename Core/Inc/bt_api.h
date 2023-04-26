@@ -3,6 +3,8 @@
 #include "ncerr.h"
 #include "cmsis_os.h"
 #include "stm32f4xx_hal.h"
+#include "stm32f4xx_hal_rng.h" // random number generator
+
 
 #define PBUFF_SIZE 32
 
@@ -31,6 +33,7 @@ const char * get_desired_remote_address();
 
 err connect_and_enter_hid(UART_HandleTypeDef* pHandle);
 err bt_do_wiggle(void);
+err bt_do_wiggle_random(RNG_HandleTypeDef* rng);
 
 err is_bt_module_connected();
 void set_active_bt_module(uint16_t uid, UART_HandleTypeDef* pHandle);
