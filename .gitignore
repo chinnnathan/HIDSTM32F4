@@ -4,3 +4,4 @@ Debug/
 MouseWiggle.ioc
 .metadata/*
 STM32F407VETX_FLASH.ld
+build/
