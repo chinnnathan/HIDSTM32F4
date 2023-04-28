@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <cstring>
 
+#include "rot_enc.hpp"
+
 namespace 
 {
     FontDef_t* useFont = &Font_7x10;

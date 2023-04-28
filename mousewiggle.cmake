@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
 
-
-set(FW_ROOT /workspaces/docker/STM32/F407/MouseWiggle)
-
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
@@ -41,11 +38,12 @@ set(CMAKE_ASM_COMPILER ${toolprefix}gcc)
 
 # set_target_properties(${EXECUTABLE} PROPERTIES LINKER_LANGUAGE CXX)
 set(libdeps
-    Core
-    STM32F4xx_HAL_Driver
-    CMSIS
-    FreeRTOS
+    ""
 )
+set(srcs 
+    ""
+)
+
 
 # set(EXECUTABLE ${PROJECT_NAME}.out)
 
@@ -88,4 +86,4 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
-# add_subdirectory(${FW_ROOT}/Core)
+# 

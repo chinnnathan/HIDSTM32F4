@@ -11,27 +11,12 @@ project(MouseWiggle CXX C)
 # set(CMAKE_CXX_STANDARD 17)
 # set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # set(CMAKE_CXX_EXTENSIONS ON)
-
 set(EXECUTABLE ${PROJECT_NAME}.out)
-set(srcs 
-    Core/Src/main.c
-    Core/Src/stm32f4xx_it.c
-    Core/Src/stm32f4xx_hal_msp.c
-    Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.c
-    Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc_ex.c
-    Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash.c
-    Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash_ex.c
-    Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash_ramfunc.c
-    Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_gpio.c
-    Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma_ex.c
-    Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma.c
-    Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pwr.c
-    Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pwr_ex.c
-    Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.c
-    Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.c
-    Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_exti.c
-    Core/Src/system_stm32f4xx.c  
-)
+
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/Drivers)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/Core)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/IO)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/Middlewares/Third_Party/FreeRTOS)
 
 add_executable(${EXECUTABLE} "${srcs}")
 
@@ -41,14 +26,7 @@ target_compile_definitions(${EXECUTABLE} PRIVATE
     )
 
 target_include_directories(${EXECUTABLE} PRIVATE
-    Core/Inc
-    Drivers/STM32F4xx_HAL_Driver/Inc
-    Drivers/STM32F4xx_HAL_Driver/Inc/Legacy
-    Drivers/CMSIS/Device/ST/STM32F4xx/Include
-    Drivers/CMSIS/Include
-    MiddleWares/Third_Party/FreeRTOS/Source/CMSIS_RTOS
-    MiddleWares/Third_Party/FreeRTOS/Source/include
-    MiddleWares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F
+    "${libdeps}"
     )
 
 target_compile_options(${EXECUTABLE} PRIVATE
