@@ -1,0 +1,10 @@
+source [find interface/stlink.cfg]
+
+gdb_flash_program enable
+gdb_breakpoint_override hard
+
+source [find target/stm32f4x.cfg]
+
+init
+tpiu config internal - uart off 96000000
+itm ports on

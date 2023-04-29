@@ -10,13 +10,12 @@ set(libdeps
 )
 
 # Define library
-set ( srcs
-    "${srcs}"
-    ${CMAKE_CURRENT_LIST_DIR}/src/rot_enc.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/src/oled_io.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/src/ssd1306.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/fonts.c
+set ( localSources 
+    ${CMAKE_CURRENT_LIST_DIR}/src/tasks.cpp
 )
 
+list( APPEND srcs 
+    "${localSources}"
+)
 set (srcs "${srcs}" PARENT_SCOPE)
 set (libdeps "${libdeps}" PARENT_SCOPE)

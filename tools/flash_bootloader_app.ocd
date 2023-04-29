@@ -1,0 +1,5 @@
+init 
+
+program ../build/MouseWiggle.bin verify 0x08000000
+
+reset

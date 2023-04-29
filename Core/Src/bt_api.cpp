@@ -19,6 +19,7 @@
 //#define GET_INQ 1
 //#define GET_MODE 1
 constexpr int maxMove = 50;
+constexpr int maxWiggles = 5;
 
 namespace
 {
@@ -176,10 +177,10 @@ err bt_do_wiggle(void)
 
 err bt_do_wiggle_random(RNG_HandleTypeDef *rng)
 {
-    int x[3];
-    int y[3];
+    int x[maxWiggles];
+    int y[maxWiggles];
 
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < maxWiggles; i++)
     {
         x[i] = (HAL_RNG_GetRandomNumber(rng) % maxMove);
         y[i] = (HAL_RNG_GetRandomNumber(rng) % maxMove);
@@ -188,7 +189,7 @@ err bt_do_wiggle_random(RNG_HandleTypeDef *rng)
         osDelay(50);
     }
 
-    for(int i = 0; i < 3; i++)
+    for(int i = 0; i < maxWiggles; i++)
     {
         pBtModule->mouse_command(0,-1 * x[i], -1 *y[i]);
         osDelay(50);

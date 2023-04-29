@@ -18,6 +18,11 @@ set ( srcs
     ${CMAKE_CURRENT_LIST_DIR}/Src/stm32f4xx_hal_msp.c
     ${CMAKE_CURRENT_LIST_DIR}/Src/stm32f4xx_hal_timebase_tim.c
     ${CMAKE_CURRENT_LIST_DIR}/Src/system_stm32f4xx.c
+    ${CMAKE_CURRENT_LIST_DIR}/Src/uart.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/Src/bt.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/Src/bt_api.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/Src/system_stm32f4xx.c
+    ${CMAKE_CURRENT_LIST_DIR}/Startup/startup_stm32f407vetx.s
 )
 
 set (srcs "${srcs}" PARENT_SCOPE)

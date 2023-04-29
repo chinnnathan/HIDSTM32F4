@@ -11,9 +11,6 @@ set(libdeps
     ${CMAKE_CURRENT_LIST_DIR}/Source/portable/GCC/ARM_CM4F
 )
 
-message("========================")
-message("${libdeps}")
-message("========================")
 # Define library
 set ( localSources 
     ${CMAKE_CURRENT_LIST_DIR}/Source/croutine.c

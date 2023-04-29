@@ -12,7 +12,8 @@
  extern "C" {
 #endif
 
-
+void WiggleTaskUart1(void const * argument);
+void StartWiggleTask(void const * argument);
 err enter_uart_task(UART_HandleTypeDef *pHandle);
 
 #ifdef __cplusplus
