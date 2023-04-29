@@ -172,7 +172,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-//   osThreadDef(wiggleTask, StartWiggleTask, osPriorityAboveNormal, 1, 2048);
+//   osThreadDef(wiggleTask, StartWiggleTask, osPriorityNormal, 1, 2048);
 //   wiggleTaskHandle = osThreadCreate(osThread(wiggleTask), NULL);
 
   osThreadDef(wiggleTaskUart1, WiggleTaskUart1, osPriorityNormal, 1, 2048);

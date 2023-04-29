@@ -69,6 +69,19 @@ void WiggleTaskUart1(void const * argument)
 
     for (;;)
     {
+        if (!moduleConnectMask.idleEnablePin)
+        {
+            if (toggle)
+            {
+                SSD1306_Clear();
+                snprintf(buffer, sizeof(buffer), "Idle");
+                print_oled(OLED_DATA, buffer);
+                toggle = 0;
+                HAL_SuspendTick();
+                HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+            } 
+            continue;
+        }
         inputSelect = (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_7) == GPIO_PIN_SET)) << 0 |
                   (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_8) == GPIO_PIN_SET)) << 1 |
                   (1 & (HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_9) == GPIO_PIN_SET)) << 2; // |
@@ -110,7 +123,7 @@ void WiggleTaskUart1(void const * argument)
  */
 void StartWiggleTask(void const * argument)
 {
-	uint16_t secRuns = 60 * 8;
+    uint16_t secRuns = (60 * 8) / 2;
     err connectStatus = NC_INVALID;
 	uint16_t secRun  = 0;
     char buffer[18];
@@ -149,7 +162,6 @@ void StartWiggleTask(void const * argument)
             toggle = 0;
             HAL_SuspendTick();
             HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
-            HAL_ResumeTick();
         } 
         continue;
     }
@@ -175,10 +187,10 @@ void StartWiggleTask(void const * argument)
         }
         else
         {
-            bt_do_wiggle();
-            // bt_do_wiggle_random(&hrng);
+            set_active_bt_module(0, &huart1);
+            bt_do_wiggle_random(&hrng);
             print_oled(OLED_INFO, "BlueTooth Wiggle");
-            secRunArray[0] = secRuns;
+            secRunArray[0] = (HAL_RNG_GetRandomNumber(&hrng) % secRuns) + secRuns;
             snprintf(subbuf, sizeof(subbuf), "ADR:%.12s", (char*)get_remote_address());
             print_oled(OLED_DATA, subbuf);
         }
@@ -196,10 +208,10 @@ void StartWiggleTask(void const * argument)
         }
         else
         {
-            // bt_do_wiggle_random(&hrng);
-            bt_do_wiggle();
+            set_active_bt_module(1, &huart2);
+            bt_do_wiggle_random(&hrng);
             print_oled(OLED_INFO, "BlueTooth Wiggle");
-            secRunArray[1] = secRuns;
+            secRunArray[1] = (HAL_RNG_GetRandomNumber(&hrng) % secRuns) + secRuns;
             snprintf(subbuf, sizeof(subbuf), "ADR:%.12s", (char*)get_remote_address());
             print_oled(OLED_SUBDATA, subbuf);
         }
